@@ -3,8 +3,6 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
-    paths:
-      - .github/workflows/generate-gpio-testplan-excel.yml
 
 jobs:
   build:
