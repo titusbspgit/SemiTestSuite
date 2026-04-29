@@ -1,0 +1,283 @@
+name: Generate GPIO TestPlan Excel
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - .github/workflows/generate-gpio-testplan-excel.yml
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      JSON_DATA: |
+        {
+          "ip": "GPIO",
+          "repo": "titusbspgit/SemiTestSuite@main",
+          "source_root": "TestRepo/gpio",
+          "generated_from_paths": [
+            "TestRepo/gpio/gpio_reg_wr_rd_test",
+            "TestRepo/gpio/test_gpio_nedge_alternate_pads_en",
+            "TestRepo/gpio/test_gpio_negedge_intr_en",
+            "TestRepo/gpio/test_gpio_pedge_all_pads_en",
+            "TestRepo/gpio/test_gpio_pedge_alternate_pads_en"
+          ],
+          "generated_on": "2026-04-29T00:00:00+05:30",
+          "testcases": [
+            {
+              "TestID": "gpio_reg_wr_rd_test",
+              "Title": "GPIO Reg Wr Rd Test",
+              "Description": "Auto-generated from repository structure",
+              "Owner": "",
+              "Priority": "Medium",
+              "Status": "Draft",
+              "Tags": [
+                "GPIO"
+              ],
+              "Feature": "GPIO",
+              "Category": "Functional",
+              "Preconditions": "",
+              "Steps": [
+                ""
+              ],
+              "ExpectedResults": [
+                ""
+              ],
+              "TestPath": "TestRepo/gpio/gpio_reg_wr_rd_test",
+              "TestURL": "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/gpio/gpio_reg_wr_rd_test",
+              "Requirements": [],
+              "Parameters": {},
+              "Artifacts": []
+            },
+            {
+              "TestID": "test_gpio_nedge_alternate_pads_en",
+              "Title": "Test Gpio Nedge Alternate Pads En",
+              "Description": "Auto-generated from repository structure",
+              "Owner": "",
+              "Priority": "Medium",
+              "Status": "Draft",
+              "Tags": [
+                "GPIO"
+              ],
+              "Feature": "GPIO",
+              "Category": "Functional",
+              "Preconditions": "",
+              "Steps": [
+                ""
+              ],
+              "ExpectedResults": [
+                ""
+              ],
+              "TestPath": "TestRepo/gpio/test_gpio_nedge_alternate_pads_en",
+              "TestURL": "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/gpio/test_gpio_nedge_alternate_pads_en",
+              "Requirements": [],
+              "Parameters": {},
+              "Artifacts": []
+            },
+            {
+              "TestID": "test_gpio_negedge_intr_en",
+              "Title": "Test Gpio Negedge Intr En",
+              "Description": "Auto-generated from repository structure",
+              "Owner": "",
+              "Priority": "Medium",
+              "Status": "Draft",
+              "Tags": [
+                "GPIO"
+              ],
+              "Feature": "GPIO",
+              "Category": "Functional",
+              "Preconditions": "",
+              "Steps": [
+                ""
+              ],
+              "ExpectedResults": [
+                ""
+              ],
+              "TestPath": "TestRepo/gpio/test_gpio_negedge_intr_en",
+              "TestURL": "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/gpio/test_gpio_negedge_intr_en",
+              "Requirements": [],
+              "Parameters": {},
+              "Artifacts": []
+            },
+            {
+              "TestID": "test_gpio_pedge_all_pads_en",
+              "Title": "Test Gpio Pedge All Pads En",
+              "Description": "Auto-generated from repository structure",
+              "Owner": "",
+              "Priority": "Medium",
+              "Status": "Draft",
+              "Tags": [
+                "GPIO"
+              ],
+              "Feature": "GPIO",
+              "Category": "Functional",
+              "Preconditions": "",
+              "Steps": [
+                ""
+              ],
+              "ExpectedResults": [
+                ""
+              ],
+              "TestPath": "TestRepo/gpio/test_gpio_pedge_all_pads_en",
+              "TestURL": "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/gpio/test_gpio_pedge_all_pads_en",
+              "Requirements": [],
+              "Parameters": {},
+              "Artifacts": []
+            },
+            {
+              "TestID": "test_gpio_pedge_alternate_pads_en",
+              "Title": "Test Gpio Pedge Alternate Pads En",
+              "Description": "Auto-generated from repository structure",
+              "Owner": "",
+              "Priority": "Medium",
+              "Status": "Draft",
+              "Tags": [
+                "GPIO"
+              ],
+              "Feature": "GPIO",
+              "Category": "Functional",
+              "Preconditions": "",
+              "Steps": [
+                ""
+              ],
+              "ExpectedResults": [
+                ""
+              ],
+              "TestPath": "TestRepo/gpio/test_gpio_pedge_alternate_pads_en",
+              "TestURL": "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/gpio/test_gpio_pedge_alternate_pads_en",
+              "Requirements": [],
+              "Parameters": {},
+              "Artifacts": []
+            }
+          ]
+        }
+      OUTPUT_DIR: Test_Output/GPIO/TestPlan
+      OUTPUT_FILENAME: GPIO_TestPlan_20260429_000000.xlsx
+      COMMIT_MESSAGE: Add autogenerated TestPlan for GPIO
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install openpyxl
+      - name: Generate Excel
+        run: |
+          python - << 'PY'
+          import os, json
+          from openpyxl import Workbook
+          from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+          from openpyxl.utils import get_column_letter
+
+          data_str = os.environ['JSON_DATA']
+          obj = json.loads(data_str)
+          rows = obj.get('testcases', [])
+          if not isinstance(rows, list) or not rows:
+              raise SystemExit('No testcases array found or empty')
+
+          # derive columns preserving first-seen order
+          col_order = []
+          seen = set()
+          for k in rows[0].keys():
+              col_order.append(k); seen.add(k)
+          for r in rows[1:]:
+              for k in r.keys():
+                  if k not in seen:
+                      col_order.append(k); seen.add(k)
+
+          wb = Workbook()
+          ws = wb.active
+          ws.title = 'TestPlan'
+
+          # headers
+          ws.append(col_order)
+
+          # helper to normalize complex values as JSON strings deterministically
+          def norm(v):
+              if isinstance(v, (dict, list)):
+                  return json.dumps(v, separators=(',', ':'), ensure_ascii=False)
+              return v
+
+          # rows
+          for r in rows:
+              ws.append([norm(r.get(k, "")) for k in col_order])
+
+          # freeze header row
+          ws.freeze_panes = 'A2'
+
+          # styles
+          header_fill = PatternFill('solid', fgColor='1F4E78')  # blue fill
+          header_font = Font(bold=True, color='FFFFFF')
+          center = Alignment(horizontal='center', vertical='center', wrap_text=False)
+          top_left = Alignment(horizontal='left', vertical='top', wrap_text=False)
+          top_center = Alignment(horizontal='center', vertical='top', wrap_text=False)
+
+          thin = Side(style='thin', color='000000')
+          border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+          max_col = len(col_order)
+          max_row = ws.max_row
+
+          # header styling
+          for c in range(1, max_col+1):
+              cell = ws.cell(row=1, column=c)
+              cell.fill = header_fill
+              cell.font = header_font
+              cell.alignment = center
+              cell.border = border
+
+          # wrap only for specific headers if they exist
+          wrap_headers = {'Test Description', 'Remarks', 'Test Steps / Procedure', 'Validation / Acceptance Criteria'}
+          wrap_cols = {i+1 for i,h in enumerate(col_order) if h in wrap_headers}
+
+          # data cell styling
+          for r in range(2, max_row+1):
+              for c in range(1, max_col+1):
+                  cell = ws.cell(row=r, column=c)
+                  v = cell.value
+                  if isinstance(v, (int, float)):
+                      cell.alignment = top_center
+                  else:
+                      cell.alignment = top_left
+                  if c in wrap_cols:
+                      cell.alignment = Alignment(horizontal=cell.alignment.horizontal, vertical='top', wrap_text=True)
+                  cell.border = border
+
+          # approx auto-fit columns by content length
+          for c in range(1, max_col+1):
+              header = ws.cell(row=1, column=c).value
+              width = max(len(str(header)), 10)
+              for r in range(2, max_row+1):
+                  val = ws.cell(row=r, column=c).value
+                  if val is None:
+                      continue
+                  l = len(str(val))
+                  if l > width:
+                      width = l
+              ws.column_dimensions[get_column_letter(c)].width = min(width + 2, 80)
+
+          # ensure output dir and save
+          out_dir = os.environ['OUTPUT_DIR']
+          out_name = os.environ['OUTPUT_FILENAME']
+          os.makedirs(out_dir, exist_ok=True)
+          wb.save(os.path.join(out_dir, out_name))
+          print('Saved', os.path.join(out_dir, out_name))
+          PY
+      - name: Commit Excel
+        env:
+          OUTPUT_DIR: ${{ env.OUTPUT_DIR }}
+          OUTPUT_FILENAME: ${{ env.OUTPUT_FILENAME }}
+          COMMIT_MESSAGE: ${{ env.COMMIT_MESSAGE }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$OUTPUT_DIR/$OUTPUT_FILENAME"
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "$COMMIT_MESSAGE"
+            git push
+          fi
