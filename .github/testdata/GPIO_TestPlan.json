@@ -1,0 +1,201 @@
+{
+  "metadata": {
+    "ip": "GPIO",
+    "repo": "titusbspgit/SemiTestSuite",
+    "branch": "main",
+    "root_path": "TestRepo/gpio",
+    "source_directories": [
+      "TestRepo/gpio/gpio_reg_wr_rd_test",
+      "TestRepo/gpio/test_gpio_nedge_alternate_pads_en",
+      "TestRepo/gpio/test_gpio_negedge_intr_en",
+      "TestRepo/gpio/test_gpio_pedge_all_pads_en",
+      "TestRepo/gpio/test_gpio_pedge_alternate_pads_en"
+    ]
+  },
+  "testcases": [
+    {
+      "Index": 1,
+      "SS / Module": "GPIO",
+      "Feature": "GPIOx_ODR write/read (output mode) verification",
+      "Test Case Name": "gpio_reg_wr_rd_test",
+      "Test Description": "Verifies that writing to the GPIO output data register (GPIOA_ODR) for PA0 reflects in register readback when the pin is configured as output.",
+      "Remarks": "NA",
+      "Test Steps / Procedure": [
+        "Enable GPIOA peripheral clock: set RCC_AHB1ENR bit[0] = 1.",
+        "Configure PA0 as output: clear GPIOA_MODER bits[1:0], then set bit[0] = 1 (01b for output).",
+        "Drive PA0 high: write GPIOA_ODR |= (1 << 0).",
+        "Readback check (HIGH): verify (GPIOA_ODR & (1 << 0)) != 0; on failure, log \"FAIL: GPIO WRITE HIGH\" and halt.",
+        "Drive PA0 low: write GPIOA_ODR &= ~(1 << 0).",
+        "Readback check (LOW): verify (GPIOA_ODR & (1 << 0)) == 0; on failure, log \"FAIL: GPIO WRITE LOW\" and halt.",
+        "If both checks pass, print \"GPIO REG WR/RD TEST PASSED\" and loop."
+      ],
+      "Impacted Registers": "RCC_AHB1ENR, GPIOA_MODER, GPIOA_ODR",
+      "Validation / Acceptance Criteria": [
+        "PASS when: (GPIOA_ODR & (1 << 0)) != 0 after setting bit 0 AND (GPIOA_ODR & (1 << 0)) == 0 after clearing bit 0; success message: \"GPIO REG WR/RD TEST PASSED\".",
+        "FAIL when: condition after set is false → prints \"FAIL: GPIO WRITE HIGH\"; or condition after clear is true → prints \"FAIL: GPIO WRITE LOW\"; program halts."
+      ],
+      "Gap Analysis": "The test verifies ODR register readback only; it does not confirm electrical level on the pin or input data register (IDR) reflection. No use of BSRR or timing/drive strength checks."
+    },
+    {
+      "Index": 2,
+      "SS / Module": "GPIO",
+      "Feature": "EXTI falling-edge trigger enable on alternate pads (lines 0,2,4,6)",
+      "Test Case Name": "test_gpio_nedge_alternate_pads_en",
+      "Test Description": "Enables falling-edge trigger selection on EXTI lines for alternate pads (0, 2, 4, 6) and verifies the configuration bits are set.",
+      "Remarks": "NA",
+      "Test Steps / Procedure": [
+        "For each pin in {0, 2, 4, 6}:",
+        "- Set EXTI_FTSR bit[pin] = 1 to enable falling-edge trigger.",
+        "- Readback check: verify (EXTI_FTSR & (1 << pin)) != 0; on failure, log \"FAIL: NEDGE ALT PAD\" and halt.",
+        "If all four pins pass the readback check, print \"GPIO NEDGE ALT PADS TEST PASSED\" and loop."
+      ],
+      "Impacted Registers": "EXTI_FTSR",
+      "Validation / Acceptance Criteria": [
+        "PASS when: for pins 0, 2, 4, 6, each (EXTI_FTSR & (1 << pin)) != 0 after write; success message: \"GPIO NEDGE ALT PADS TEST PASSED\".",
+        "FAIL when: any pin's readback is 0 → prints \"FAIL: NEDGE ALT PAD\"; program halts."
+      ],
+      "Gap Analysis": "EXTI line mapping/masking and GPIO mode are not configured here; no validation of interrupt firing, pending flag, or ISR execution—only configuration bit set is checked."
+    },
+    {
+      "Index": 3,
+      "SS / Module": "GPIO",
+      "Feature": "EXTI negative-edge interrupt enable on line 1 (PA1)",
+      "Test Case Name": "test_gpio_negedge_intr_en",
+      "Test Description": "Configures PA1 as input, maps it to EXTI1, unmasks EXTI1, enables falling-edge trigger, and verifies the falling-trigger selection bit is set.",
+      "Remarks": "NA",
+      "Test Steps / Procedure": [
+        "Enable clocks: set RCC_AHB1ENR bit[0] (GPIOA) and RCC_APB2ENR bit[14] (SYSCFG).",
+        "Configure PA1 as input: clear GPIOA_MODER bits[(1*2)+1 : (1*2)] (i.e., bits 3:2) to 00.",
+        "Map PA1 to EXTI1: clear SYSCFG_EXTICR1 bits[7:4] = 0000 (select port A).",
+        "Unmask EXTI line 1: set EXTI_IMR bit[1] = 1.",
+        "Enable falling-edge trigger: set EXTI_FTSR bit[1] = 1.",
+        "Readback check: verify (EXTI_FTSR & (1 << 1)) != 0; on failure, log \"FAIL: NEG EDGE NOT ENABLED\" and halt.",
+        "If check passes, print \"GPIO NEG EDGE INTR TEST PASSED\" and loop."
+      ],
+      "Impacted Registers": "RCC_AHB1ENR, RCC_APB2ENR, GPIOA_MODER, SYSCFG_EXTICR1, EXTI_IMR, EXTI_FTSR",
+      "Validation / Acceptance Criteria": [
+        "PASS when: (EXTI_FTSR & (1 << 1)) != 0 after configuration; success message: \"GPIO NEG EDGE INTR TEST PASSED\".",
+        "FAIL when: (EXTI_FTSR & (1 << 1)) == 0 → prints \"FAIL: NEG EDGE NOT ENABLED\"; program halts."
+      ],
+      "Gap Analysis": "No verification of EXTI pending flag, NVIC routing, or ISR execution; IMR bit readback is not checked; actual external signal-induced interrupt is not validated."
+    },
+    {
+      "Index": 4,
+      "SS / Module": "GPIO",
+      "Feature": "EXTI rising-edge trigger enable on all pads (lines 0–7)",
+      "Test Case Name": "test_gpio_pedge_all_pads_en",
+      "Test Description": "Enables rising-edge trigger selection for EXTI lines 0 through 7 and verifies each configuration bit is set.",
+      "Remarks": "NA",
+      "Test Steps / Procedure": [
+        "For each i from 0 to 7:",
+        "- Set EXTI_RTSR bit[i] = 1 to enable rising-edge trigger.",
+        "- Readback check: verify (EXTI_RTSR & (1 << i)) != 0; on failure, log \"FAIL: PEDGE ALL PADS\" and halt.",
+        "If all eight lines pass the readback check, print \"GPIO PEDGE ALL PADS TEST PASSED\" and loop."
+      ],
+      "Impacted Registers": "EXTI_RTSR",
+      "Validation / Acceptance Criteria": [
+        "PASS when: for i = 0..7, each (EXTI_RTSR & (1 << i)) != 0 after write; success message: \"GPIO PEDGE ALL PADS TEST PASSED\".",
+        "FAIL when: any line's readback is 0 → prints \"FAIL: PEDGE ALL PADS\"; program halts."
+      ],
+      "Gap Analysis": "Does not configure GPIO-to-EXTI mapping or input modes; no verification of actual interrupt events—only configuration bits are checked."
+    },
+    {
+      "Index": 5,
+      "SS / Module": "GPIO",
+      "Feature": "EXTI rising-edge trigger enable on alternate pads (lines 0,2,4,6)",
+      "Test Case Name": "test_gpio_pedge_alternate_pads_en",
+      "Test Description": "Enables rising-edge trigger selection on EXTI lines for alternate pads (0, 2, 4, 6) and verifies the configuration bits are set.",
+      "Remarks": "NA",
+      "Test Steps / Procedure": [
+        "For each pin in {0, 2, 4, 6}:",
+        "- Set EXTI_RTSR bit[pin] = 1 to enable rising-edge trigger.",
+        "- Readback check: verify (EXTI_RTSR & (1 << pin)) != 0; on failure, log \"FAIL: PEDGE ALT PAD\" and halt.",
+        "If all four pins pass the readback check, print \"GPIO PEDGE ALT PADS TEST PASSED\" and loop."
+      ],
+      "Impacted Registers": "EXTI_RTSR",
+      "Validation / Acceptance Criteria": [
+        "PASS when: for pins 0, 2, 4, 6, each (EXTI_RTSR & (1 << pin)) != 0 after write; success message: \"GPIO PEDGE ALT PADS TEST PASSED\".",
+        "FAIL when: any pin's readback is 0 → prints \"FAIL: PEDGE ALT PAD\"; program halts."
+      ],
+      "Gap Analysis": "No EXTI line mapping/masking or GPIO configuration; does not validate interrupt generation—only configuration bits are checked."
+    }
+  ],
+  "evidence": {
+    "gpio_reg_wr_rd_test": {
+      "files": {
+        "program.c": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/gpio_reg_wr_rd_test/program.c",
+        "gpio_reg_wr_rd_test.h": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/gpio_reg_wr_rd_test/gpio_reg_wr_rd_test.h"
+      },
+      "key_strings": [
+        "PA0 output",
+        "FAIL: GPIO WRITE HIGH",
+        "FAIL: GPIO WRITE LOW",
+        "GPIO REG WR/RD TEST PASSED"
+      ],
+      "macros": [
+        "RCC_AHB1ENR",
+        "GPIOA_MODER",
+        "GPIOA_ODR"
+      ]
+    },
+    "test_gpio_nedge_alternate_pads_en": {
+      "files": {
+        "program.c": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/test_gpio_nedge_alternate_pads_en/program.c",
+        "test_gpio_nedge_alternate_pads_en.h": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/test_gpio_nedge_alternate_pads_en/test_gpio_nedge_alternate_pads_en.h"
+      },
+      "key_strings": [
+        "FAIL: NEDGE ALT PAD",
+        "GPIO NEDGE ALT PADS TEST PASSED"
+      ],
+      "macros": [
+        "EXTI_FTSR"
+      ]
+    },
+    "test_gpio_negedge_intr_en": {
+      "files": {
+        "program.c": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/test_gpio_negedge_intr_en/program.c",
+        "test_gpio_negedge_intr_en.h": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/test_gpio_negedge_intr_en/test_gpio_negedge_intr_en.h"
+      },
+      "key_strings": [
+        "PA1 input",
+        "PA1 → EXTI1",
+        "FAIL: NEG EDGE NOT ENABLED",
+        "GPIO NEG EDGE INTR TEST PASSED"
+      ],
+      "macros": [
+        "RCC_AHB1ENR",
+        "RCC_APB2ENR",
+        "GPIOA_MODER",
+        "SYSCFG_EXTICR1",
+        "EXTI_IMR",
+        "EXTI_FTSR"
+      ]
+    },
+    "test_gpio_pedge_all_pads_en": {
+      "files": {
+        "program.c": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/test_gpio_pedge_all_pads_en/program.c",
+        "test_gpio_pedge_all_pads_en.h": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/test_gpio_pedge_all_pads_en/test_gpio_pedge_all_pads_en.h"
+      },
+      "key_strings": [
+        "FAIL: PEDGE ALL PADS",
+        "GPIO PEDGE ALL PADS TEST PASSED"
+      ],
+      "macros": [
+        "EXTI_RTSR"
+      ]
+    },
+    "test_gpio_pedge_alternate_pads_en": {
+      "files": {
+        "program.c": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/test_gpio_pedge_alternate_pads_en/program.c",
+        "test_gpio_pedge_alternate_pads_en.h": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/test_gpio_pedge_alternate_pads_en/test_gpio_pedge_alternate_pads_en.h"
+      },
+      "key_strings": [
+        "FAIL: PEDGE ALT PAD",
+        "GPIO PEDGE ALT PADS TEST PASSED"
+      ],
+      "macros": [
+        "EXTI_RTSR"
+      ]
+    }
+  }
+}
