@@ -1,0 +1,72 @@
+[
+  {
+    "Index": "1",
+    "SS / Module": "GPIO",
+    "Feature": "GPIO output register read/write verification",
+    "Test Case Name": "gpio_reg_wr_rd_test",
+    "Test Description": "Enables GPIOA, configures PA0 as output, writes high and low to the output data register, and verifies the corresponding bit state by reading back.",
+    "Speed": "NA",
+    "Mode": "Polling",
+    "Remarks": "RCC_AHB1ENR must enable the GPIOA clock before accessing GPIOA_MODER and GPIOA_ODR. PA0 must be configured as output in GPIOA_MODER.",
+    "Test Steps / Procedure": "1) Enable GPIOA clock. 2) Configure PA0 as output. 3) Drive PA0 high. 4) Verify PA0 output bit reads back high. 5) Drive PA0 low. 6) Verify PA0 output bit reads back low. 7) Declare test pass.",
+    "Impacted Registers": "RCC_AHB1ENR, GPIOA_MODER, GPIOA_ODR",
+    "Validation / Acceptance Criteria": "After setting PA0 high, GPIOA_ODR bit 0 must read as 1; after clearing PA0 low, GPIOA_ODR bit 0 must read as 0. On any mismatch, the test fails; otherwise, it passes.",
+    "Gap Analysis": "No verification of actual pad state beyond register readback. No coverage of additional pins or alternate modes. No error handling beyond simple fail-stop."
+  },
+  {
+    "Index": "2",
+    "SS / Module": "GPIO",
+    "Feature": "Falling edge trigger enable on alternate GPIO pads",
+    "Test Case Name": "test_gpio_nedge_alternate_pads_en",
+    "Test Description": "Enables falling edge trigger on external interrupt lines for alternate pads (0, 2, 4, 6) and verifies that each enable bit is set.",
+    "Speed": "NA",
+    "Mode": "Polling",
+    "Remarks": "NA",
+    "Test Steps / Procedure": "1) For pins 0, 2, 4, and 6, enable falling edge trigger. 2) Verify each corresponding falling edge trigger bit is set. 3) Declare test pass.",
+    "Impacted Registers": "EXTI_FTSR",
+    "Validation / Acceptance Criteria": "For pins 0, 2, 4, and 6, after setting, EXTI_FTSR bits must read as 1. On any mismatch, the test fails; otherwise, it passes.",
+    "Gap Analysis": "No configuration of pin-to-EXTI mapping or input mode. No masking/unmasking verification and no interrupt generation/handling. Limited to bit-set confirmation for selected lines only."
+  },
+  {
+    "Index": "3",
+    "SS / Module": "GPIO",
+    "Feature": "Negative edge interrupt enable for GPIO pin",
+    "Test Case Name": "test_gpio_negedge_intr_en",
+    "Test Description": "Enables clocks, configures PA1 as input, maps PA1 to EXTI1, enables mask and falling edge trigger, and verifies the falling edge enable bit for line 1.",
+    "Speed": "NA",
+    "Mode": "Polling",
+    "Remarks": "RCC_AHB1ENR and RCC_APB2ENR must enable the clocks before accessing GPIOA_MODER and SYSCFG_EXTICR1. PA1 must be configured as input in GPIOA_MODER prior to enabling EXTI.",
+    "Test Steps / Procedure": "1) Enable required peripheral clocks. 2) Configure PA1 as input. 3) Map PA1 to EXTI line 1. 4) Unmask EXTI line 1 and enable falling edge trigger. 5) Verify falling edge trigger bit for line 1 is set. 6) Declare test pass.",
+    "Impacted Registers": "RCC_AHB1ENR, RCC_APB2ENR, GPIOA_MODER, SYSCFG_EXTICR1, EXTI_IMR, EXTI_FTSR",
+    "Validation / Acceptance Criteria": "After configuration, EXTI_FTSR bit 1 must read as 1. On mismatch, the test fails; otherwise, it passes.",
+    "Gap Analysis": "No verification of EXTI pending flags, no interrupt service routine or NVIC configuration, and no validation of mask state beyond setting. Functional behavior on actual signal edges is not exercised."
+  },
+  {
+    "Index": "4",
+    "SS / Module": "GPIO",
+    "Feature": "Rising edge trigger enable on all GPIO pads (0–7)",
+    "Test Case Name": "test_gpio_pedge_all_pads_en",
+    "Test Description": "Iterates through lines 0 to 7, enables rising edge trigger for each, and verifies each enable bit.",
+    "Speed": "NA",
+    "Mode": "Polling",
+    "Remarks": "NA",
+    "Test Steps / Procedure": "1) For pins 0 through 7, enable rising edge trigger. 2) Verify each corresponding rising edge trigger bit is set. 3) Declare test pass.",
+    "Impacted Registers": "EXTI_RTSR",
+    "Validation / Acceptance Criteria": "For lines 0 to 7, EXTI_RTSR bits must read as 1 after being set. On any mismatch, the test fails; otherwise, it passes.",
+    "Gap Analysis": "No configuration of pin-to-EXTI mapping or input setup. No interrupt mask configuration or ISR validation. Only confirms bit-set state without exercising edge events."
+  },
+  {
+    "Index": "5",
+    "SS / Module": "GPIO",
+    "Feature": "Rising edge trigger enable on alternate GPIO pads",
+    "Test Case Name": "test_gpio_pedge_alternate_pads_en",
+    "Test Description": "Enables rising edge trigger on external interrupt lines for alternate pads (0, 2, 4, 6) and verifies that each enable bit is set.",
+    "Speed": "NA",
+    "Mode": "Polling",
+    "Remarks": "NA",
+    "Test Steps / Procedure": "1) For pins 0, 2, 4, and 6, enable rising edge trigger. 2) Verify each corresponding rising edge trigger bit is set. 3) Declare test pass.",
+    "Impacted Registers": "EXTI_RTSR",
+    "Validation / Acceptance Criteria": "For pins 0, 2, 4, and 6, after setting, EXTI_RTSR bits must read as 1. On any mismatch, the test fails; otherwise, it passes.",
+    "Gap Analysis": "Does not configure pin-to-EXTI mapping or input characteristics. No interrupt mask or service validation. Limited to checking register bit setting for selected lines."
+  }
+]
