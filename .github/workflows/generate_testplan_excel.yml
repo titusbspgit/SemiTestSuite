@@ -40,4 +40,4 @@ jobs:
           else
             echo "No Excel generated"
             exit 1
-          }
+          fi
