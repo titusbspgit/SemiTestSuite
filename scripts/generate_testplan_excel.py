@@ -1,65 +1,71 @@
-#!/usr/bin/env python3
-import argparse, json, os
-from datetime import datetime
-try:
-    from zoneinfo import ZoneInfo
-except Exception:
-    from backports.zoneinfo import ZoneInfo
-import pandas as pd
+import json
+import os
+from datetime import datetime, timezone, timedelta
+from openpyxl import Workbook
 from openpyxl.styles import Font
 
-REQUIRED_COLUMNS = [
-    'Index',
-    'SS / Module',
-    'Feature',
-    'Test Case Name',
-    'Test Description',
-    'Speed',
-    'Mode',
-    'Remarks',
-    'Test Steps / Procedure',
-    'Impacted Registers',
-    'Validation / Acceptance Criteria',
-    'Gap Analysis'
+COLUMNS = [
+    "Index",
+    "SS / Module",
+    "Feature",
+    "Test Case Name",
+    "Test Description",
+    "Speed",
+    "Mode",
+    "Remarks",
+    "Test Steps / Procedure",
+    "Impacted Registers",
+    "Validation / Acceptance Criteria",
+    "Gap Analysis",
 ]
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--json-path', required=True)
-    ap.add_argument('--output-dir', required=True)
-    args = ap.parse_args()
 
-    with open(args.json_path, 'r', encoding='utf-8') as f:
+def main():
+    # Step 1: Validate and load JSON data
+    input_path = os.path.join("data", "testplan.json")
+    with open(input_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     if not isinstance(data, list):
-        raise ValueError('json_data must be an array of objects')
-    for i, row in enumerate(data):
-        if not isinstance(row, dict):
-            raise ValueError(f'Row {i} is not an object')
+        raise SystemExit("Input JSON is not an array")
 
-    # Build rows ensuring exact column order; fill missing keys with ''
     rows = []
-    for row in data:
-        rows.append({col: row.get(col, '') for col in REQUIRED_COLUMNS})
+    for i, item in enumerate(data):
+        if not isinstance(item, dict):
+            raise SystemExit(f"Item at index {i} is not an object")
+        # Preserve exact data values; blank for missing keys
+        row = [item.get(col, "") for col in COLUMNS]
+        rows.append(row)
 
-    df = pd.DataFrame(rows, columns=REQUIRED_COLUMNS, dtype=object)
+    # Step 2: Create Excel workbook and sheet with formatting
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "TestPlan"
 
-    ist = ZoneInfo('Asia/Kolkata')
-    ts = datetime.now(ist).strftime('%Y%m%d_%H%M%S')
-    filename = f'testplan_{ts}.xlsx'
-    os.makedirs(args.output_dir, exist_ok=True)
-    xlsx_path = os.path.join(args.output_dir, filename)
+    # Header
+    ws.append(COLUMNS)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
 
-    # Write with pandas (openpyxl engine), then format header and freeze
-    with pd.ExcelWriter(xlsx_path, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='TestPlan')
-        ws = writer.book['TestPlan']
-        for cell in ws[1]:
-            cell.font = Font(bold=True)
-        ws.freeze_panes = 'A2'
+    # Freeze first row
+    ws.freeze_panes = "A2"
 
-    print(xlsx_path)
+    # Data rows
+    for row in rows:
+        ws.append(row)
 
-if __name__ == '__main__':
+    # Step 3: Save with IST timestamp
+    ist = timezone(timedelta(hours=5, minutes=30))
+    ts = datetime.now(ist).strftime("%Y%m%d_%H%M%S")
+
+    output_dir = os.path.join("Test_Output", "GPIO")
+    os.makedirs(output_dir, exist_ok=True)
+
+    output_path = os.path.join(output_dir, f"testplan_{ts}.xlsx")
+    wb.save(output_path)
+
+    print(output_path)
+
+
+if __name__ == "__main__":
     main()
