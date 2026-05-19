@@ -9,7 +9,7 @@
     "Mode": "NA",
     "Remarks": "Requires GPIOA clock enabled and PA0 available as output on target platform.",
     "Test Steps / Procedure": "1) Enable GPIOA clock. 2) Configure PA0 as output. 3) Write 1 to GPIOA_ODR bit 0. 4) Read back GPIOA_ODR bit 0 and verify it is 1. 5) Write 0 to GPIOA_ODR bit 0. 6) Read back GPIOA_ODR bit 0 and verify it is 0.",
-    "Imapcted Registers": "RCC_AHB1ENR, GPIOA_MODER, GPIOA_ODR",
+    "Impacted Registers": "RCC_AHB1ENR, GPIOA_MODER, GPIOA_ODR",
     "Validation / Acceptance Criteria": "Pass if GPIOA_ODR bit 0 reads 1 after set and 0 after clear; otherwise fail.",
     "Gap Analysis": "Hardcoded use of PA0; no verification of actual pad state (only ODR readback); no timeout or recovery handling."
   },
@@ -23,7 +23,7 @@
     "Mode": "NA",
     "Remarks": "Assumes EXTI lines 0,2,4,6 are available and mapped to valid pads on the target.",
     "Test Steps / Procedure": "1) Select pins {0,2,4,6}. 2) Set EXTI_FTSR bit for each selected pin. 3) Read back EXTI_FTSR for each pin. 4) Verify each configured bit is set. 5) Declare pass when all bits are set.",
-    "Imapcted Registers": "EXTI_FTSR",
+    "Impacted Registers": "EXTI_FTSR",
     "Validation / Acceptance Criteria": "For each pin in {0,2,4,6}, EXTI_FTSR & (1<<pin) must be non-zero; otherwise fail.",
     "Gap Analysis": "Interrupt mask and GPIO-to-EXTI mapping not configured; no runtime stimulus to confirm actual interrupt behavior; hardcoded pin list."
   },
@@ -37,7 +37,7 @@
     "Mode": "NA",
     "Remarks": "Requires GPIO and SYSCFG clocks enabled; PA1 must be present and connectable to EXTI1.",
     "Test Steps / Procedure": "1) Enable GPIO and SYSCFG clocks. 2) Configure PA1 as input. 3) Map PA1 to EXTI1 via system configuration. 4) Enable EXTI1 interrupt mask. 5) Enable falling-edge trigger for EXTI1. 6) Verify EXTI_FTSR bit for line 1 is set.",
-    "Imapcted Registers": "RCC_AHB1ENR, RCC_APB2ENR, GPIOA_MODER, SYSCFG_EXTICR1, EXTI_IMR, EXTI_FTSR",
+    "Impacted Registers": "RCC_AHB1ENR, RCC_APB2ENR, GPIOA_MODER, SYSCFG_EXTICR1, EXTI_IMR, EXTI_FTSR",
     "Validation / Acceptance Criteria": "EXTI_FTSR & (1<<1) must be non-zero; otherwise fail.",
     "Gap Analysis": "No ISR or pending flag verification; mapping and mask set but no functional edge generation; hardcoded PA1/EXTI1."
   },
@@ -51,7 +51,7 @@
     "Mode": "NA",
     "Remarks": "Assumes EXTI lines 0..7 are available and appropriately mapped on the platform.",
     "Test Steps / Procedure": "1) Iterate EXTI lines 0..7. 2) Set EXTI_RTSR bit for each line. 3) Read back EXTI_RTSR for each line. 4) Verify each configured bit is set. 5) Declare pass when all bits are set.",
-    "Imapcted Registers": "EXTI_RTSR",
+    "Impacted Registers": "EXTI_RTSR",
     "Validation / Acceptance Criteria": "For each i in 0..7, EXTI_RTSR & (1<<i) must be non-zero; otherwise fail.",
     "Gap Analysis": "Interrupt mask and GPIO-to-EXTI mapping not configured; no runtime edge stimulus to validate behavior; hardcoded line range."
   },
@@ -65,7 +65,7 @@
     "Mode": "NA",
     "Remarks": "Assumes EXTI lines 0,2,4,6 are available and mapped to valid pads on the target.",
     "Test Steps / Procedure": "1) Select pins {0,2,4,6}. 2) Set EXTI_RTSR bit for each selected pin. 3) Read back EXTI_RTSR for each pin. 4) Verify each configured bit is set. 5) Declare pass when all bits are set.",
-    "Imapcted Registers": "EXTI_RTSR",
+    "Impacted Registers": "EXTI_RTSR",
     "Validation / Acceptance Criteria": "For each pin in {0,2,4,6}, EXTI_RTSR & (1<<pin) must be non-zero; otherwise fail.",
     "Gap Analysis": "Interrupt mask and GPIO-to-EXTI mapping not configured; no runtime stimulus to confirm behavior; hardcoded pin list."
   }
