@@ -112,7 +112,7 @@ def write_excel(rows):
     for i, header in enumerate(HEADERS, start=1):
         if header in ('Remarks', 'Test Steps / Procedure', 'Validation / Acceptance Criteria'):
             ws.column_dimensions[chr(64+i)].width = 60
-        elif header in ('Imparted Registers', 'Feature', 'Test Description'):
+        elif header in ('Impacted Registers', 'Feature', 'Test Description'):
             ws.column_dimensions[chr(64+i)].width = 30
         else:
             ws.column_dimensions[chr(64+i)].width = 18
