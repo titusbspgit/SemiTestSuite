@@ -41,7 +41,14 @@
       "expected_results": [
         "ODR bit toggles reflect written values; test prints 'GPIO REG WR/RD TEST PASSED'"
       ],
-      "tags": ["gpio", "register", "write", "read", "odr", "pa0"],
+      "tags": [
+        "gpio",
+        "register",
+        "write",
+        "read",
+        "odr",
+        "pa0"
+      ],
       "priority": "P1",
       "type": "functional",
       "links": {
@@ -61,7 +68,12 @@
         "Print PASS and halt"
       ],
       "parameters": {
-        "pins": [0, 2, 4, 6],
+        "pins": [
+          0,
+          2,
+          4,
+          6
+        ],
         "registers": {
           "EXTI_FTSR": "0x40013C0C"
         }
@@ -72,7 +84,14 @@
       "expected_results": [
         "EXTI_FTSR bits for pins 0,2,4,6 are set; test prints 'GPIO NEDGE ALT PADS TEST PASSED'"
       ],
-      "tags": ["gpio", "interrupt", "falling-edge", "exti", "configuration", "alternate-pads"],
+      "tags": [
+        "gpio",
+        "interrupt",
+        "falling-edge",
+        "exti",
+        "configuration",
+        "alternate-pads"
+      ],
       "priority": "P2",
       "type": "configuration",
       "links": {
@@ -114,7 +133,14 @@
       "expected_results": [
         "EXTI1 falling-edge trigger enabled and reflected in EXTI_FTSR; test prints 'GPIO NEG EDGE INTR TEST PASSED'"
       ],
-      "tags": ["gpio", "interrupt", "falling-edge", "exti", "syscfg", "pa1"],
+      "tags": [
+        "gpio",
+        "interrupt",
+        "falling-edge",
+        "exti",
+        "syscfg",
+        "pa1"
+      ],
       "priority": "P1",
       "type": "functional",
       "links": {
@@ -134,7 +160,16 @@
         "Print PASS and halt"
       ],
       "parameters": {
-        "pins": [0, 1, 2, 3, 4, 5, 6, 7],
+        "pins": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
         "registers": {
           "EXTI_RTSR": "0x40013C08"
         }
@@ -145,7 +180,14 @@
       "expected_results": [
         "EXTI_RTSR bits for pins 0..7 are set; test prints 'GPIO PEDGE ALL PADS TEST PASSED'"
       ],
-      "tags": ["gpio", "interrupt", "rising-edge", "exti", "configuration", "all-pads"],
+      "tags": [
+        "gpio",
+        "interrupt",
+        "rising-edge",
+        "exti",
+        "configuration",
+        "all-pads"
+      ],
       "priority": "P2",
       "type": "configuration",
       "links": {
@@ -165,7 +207,12 @@
         "Print PASS and halt"
       ],
       "parameters": {
-        "pins": [0, 2, 4, 6],
+        "pins": [
+          0,
+          2,
+          4,
+          6
+        ],
         "registers": {
           "EXTI_RTSR": "0x40013C08"
         }
@@ -176,7 +223,14 @@
       "expected_results": [
         "EXTI_RTSR bits for pins 0,2,4,6 are set; test prints 'GPIO PEDGE ALT PADS TEST PASSED'"
       ],
-      "tags": ["gpio", "interrupt", "rising-edge", "exti", "configuration", "alternate-pads"],
+      "tags": [
+        "gpio",
+        "interrupt",
+        "rising-edge",
+        "exti",
+        "configuration",
+        "alternate-pads"
+      ],
       "priority": "P2",
       "type": "configuration",
       "links": {
