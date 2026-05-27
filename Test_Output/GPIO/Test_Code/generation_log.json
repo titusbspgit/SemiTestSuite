@@ -1,0 +1,15 @@
+{
+  "summary": {
+    "processed": 1,
+    "skipped": 4
+  },
+  "processed": [
+    {"index": 1, "name": "gpio_reg_wr_rd_test", "sheet": "TestPlan"}
+  ],
+  "skipped": [
+    {"row": 3, "name": "test_gpio_nedge_alternate_pads_en", "reason": "Code Generation != Required"},
+    {"row": 4, "name": "test_gpio_negedge_intr_en", "reason": "Code Generation != Required"},
+    {"row": 5, "name": "test_gpio_pedge_all_pads_en", "reason": "Code Generation != Required"},
+    {"row": 6, "name": "test_gpio_pedge_alternate_pads_en", "reason": "Code Generation != Required"}
+  ]
+}

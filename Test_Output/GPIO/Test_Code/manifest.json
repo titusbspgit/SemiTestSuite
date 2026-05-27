@@ -1,0 +1,13 @@
+{
+  "tests": {
+    "1": {
+      "test_case_name": "gpio_reg_wr_rd_test",
+      "folder": "Test_Output/GPIO/Test_Code/gpio_reg_wr_rd_test/",
+      "files": [
+        "gpio_reg_wr_rd_test.c",
+        "gpio_reg_wr_rd_test.h"
+      ],
+      "github_path": "Test_Output/GPIO/Test_Code/gpio_reg_wr_rd_test/"
+    }
+  }
+}
