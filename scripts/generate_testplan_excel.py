@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
-# noop-change: trigger workflow run
 import json
 import os
-from datetime import datetime
-import pytz
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
 
-# Constants
-INPUT_JSON_PATH = os.path.join('Test_Output', 'GPIO', 'testplan_data.json')
-OUTPUT_DIR = os.path.join('Test_Output', 'GPIO')
-SHEET_NAME = 'TestPlan'
+ROOT = Path(__file__).resolve().parents[1]
+DATA_JSON_PATH = ROOT / 'data' / 'testplan_gpio.json'
+OUTPUT_DIR = Path(os.environ.get('OUTPUT_DIR', ROOT / 'Test_Output' / 'GPIO'))
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# IST timezone (UTC+5:30)
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def ist_timestamp():
+    return datetime.now(IST).strftime('%Y%m%d_%H%M%S')
+
 HEADERS = [
     'Index',
     'SS / Module',
@@ -23,78 +30,110 @@ HEADERS = [
     'Test Steps / Procedure',
     'Impacted Registers',
     'Validation / Acceptance Criteria',
-    'Gap Analysis'
+    'Gap Analysis',
 ]
 
 
-def main():
-    # Step 1 — Validate JSON
-    with open(INPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+def load_json():
+    with open(DATA_JSON_PATH, 'r', encoding='utf-8') as f:
         data = json.load(f)
-    if not isinstance(data, list):
-        raise ValueError('Input JSON must be an array of row objects.')
+    # Accept either an array of tests or an object with 'tests'
+    if isinstance(data, list):
+        top_level = {}
+        tests = data
+    elif isinstance(data, dict) and 'tests' in data and isinstance(data['tests'], list):
+        top_level = data
+        tests = data['tests']
+    else:
+        raise ValueError('Invalid json_data: expected array or object with key "tests" as array')
+    return top_level, tests
 
-    # Ensure no data loss: verify all required keys exist in every row
-    for i, row in enumerate(data, 1):
-        if not isinstance(row, dict):
-            raise ValueError(f'Row {i} is not an object.')
-        for h in HEADERS:
-            if h not in row:
-                # Fill missing columns with 'NA' to keep structure stable
-                row[h] = 'NA'
 
-    # Step 2 — Create workbook and sheet
+def to_json_str(obj):
+    return json.dumps(obj, ensure_ascii=False, separators=(',', ':'), sort_keys=False)
+
+
+def build_rows(top_level, tests):
+    ip = top_level.get('ip', '') if isinstance(top_level, dict) else ''
+    rows = []
+    for idx, t in enumerate(tests, start=1):
+        feature = t.get('type') or ','.join(t.get('tags', []) or [])
+        test_name = t.get('id') or t.get('name') or ''
+        description = t.get('description') or ''
+        steps = '\n'.join(t.get('steps', []) or [])
+        impacted_regs = to_json_str(((t.get('parameters') or {}).get('registers') or {}))
+        vac = '\n'.join(t.get('expected_results', []) or [])
+        remarks = to_json_str(t)
+        row = [
+            idx,                 # Index
+            ip,                  # SS / Module
+            feature or '',       # Feature
+            test_name,           # Test Case Name
+            description,         # Test Description
+            '',                  # Speed (unknown)
+            '',                  # Mode (unknown)
+            remarks,             # Remarks (full test JSON to avoid data loss)
+            steps,               # Test Steps / Procedure
+            impacted_regs,       # Impacted Registers
+            vac,                 # Validation / Acceptance Criteria
+            '',                  # Gap Analysis
+        ]
+        rows.append(row)
+    return rows
+
+
+def write_excel(rows):
     wb = Workbook()
     ws = wb.active
-    ws.title = SHEET_NAME
+    ws.title = 'TestPlan'
 
-    # Header row
+    # Header
     ws.append(HEADERS)
-    header_font = Font(bold=True)
-    for col_idx in range(1, len(HEADERS) + 1):
-        cell = ws.cell(row=1, column=col_idx)
-        cell.font = header_font
-        cell.alignment = Alignment(wrap_text=True, vertical='top')
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(vertical='center')
 
     # Data rows
-    for row in data:
-        values = [row.get(h, 'NA') for h in HEADERS]
-        ws.append(values)
+    wrap_cols = {8, 9, 10, 11}  # Remarks, Steps, Impacted Registers, VAC
+    for row in rows:
+        ws.append(row)
+    # Apply wrap and top alignment
+    for r in ws.iter_rows(min_row=2, max_row=ws.max_row):
+        for i, cell in enumerate(r, start=1):
+            if i in wrap_cols:
+                cell.alignment = Alignment(wrap_text=True, vertical='top')
+            else:
+                cell.alignment = Alignment(vertical='top')
 
-    # Formatting: wrap text and align top for all data cells
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=len(HEADERS)):
-        for cell in row:
-            cell.alignment = Alignment(wrap_text=True, vertical='top')
-
-    # Freeze first row
+    # Freeze header row
     ws.freeze_panes = 'A2'
 
-    # Set some reasonable column widths
-    widths = {
-        'A': 8,   # Index
-        'B': 14,  # SS / Module
-        'C': 28,  # Feature
-        'D': 36,  # Test Case Name
-        'E': 46,  # Test Description
-        'F': 10,  # Speed
-        'G': 10,  # Mode
-        'H': 22,  # Remarks
-        'I': 60,  # Test Steps / Procedure
-        'J': 28,  # Impacted Registers
-        'K': 56,  # Validation / Acceptance Criteria
-        'L': 56,  # Gap Analysis
-    }
-    for col, width in widths.items():
-        ws.column_dimensions[col].width = width
+    # Best-effort column width
+    for i, header in enumerate(HEADERS, start=1):
+        if header in ('Remarks', 'Test Steps / Procedure', 'Validation / Acceptance Criteria'):
+            ws.column_dimensions[chr(64+i)].width = 60
+        elif header in ('Imparted Registers', 'Feature', 'Test Description'):
+            ws.column_dimensions[chr(64+i)].width = 30
+        else:
+            ws.column_dimensions[chr(64+i)].width = 18
 
-    # Step 3 — Save file with IST timestamp
-    ist = pytz.timezone('Asia/Kolkata')
-    ts = datetime.now(ist).strftime('%Y%m%d_%H%M%S')
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    out_path = os.path.join(OUTPUT_DIR, f'testplan_{ts}.xlsx')
+    ts = ist_timestamp()
+    out_path = OUTPUT_DIR / f'testplan_{ts}.xlsx'
     wb.save(out_path)
     print(f'Wrote Excel: {out_path}')
+    return str(out_path)
 
+
+def main():
+    top_level, tests = load_json()
+    rows = build_rows(top_level, tests)
+    path = write_excel(rows)
+    # Also drop a pointer file to the latest path (optional, non-fatal)
+    try:
+        with open(OUTPUT_DIR / 'LATEST_PATH.txt', 'w', encoding='utf-8') as f:
+            f.write(path + '\n')
+    except Exception:
+        pass
 
 if __name__ == '__main__':
     main()
