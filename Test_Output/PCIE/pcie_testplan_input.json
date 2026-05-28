@@ -1,0 +1,78 @@
+{
+  "status": "SUCCESS",
+  "ip_name": "PCIE",
+  "branch": "main",
+  "source_folders": [
+    "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/pcie/pcie_cfg_wr_rd_test",
+    "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/pcie/pcie_dbi_dsp_reg_wr_rd_test",
+    "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/pcie/pcie_dbi_usp_reg_wr_rd_test",
+    "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/pcie/pcie_sii_rc_reg_wr_rd_test"
+  ],
+  "data": [
+    {
+      "Index": "1",
+      "IP_NAME": "PCIE",
+      "SS / Module": "PCIE Config Registers",
+      "Feature": "cfg_wr_rd",
+      "Test Case Name": "pcie_cfg_wr_rd_test",
+      "Test Description": "Validate default reset values and masked read/write behavior for selected PCIe configuration registers.",
+      "Speed": "NA",
+      "Mode": "NA",
+      "Remarks": "Uses read_mask_array, write_mask_array, and skip_array to control RO/RW behavior.",
+      "Test Steps / Procedure": "1. Read each address in addr_array and compare to default_value_array using read_mask_array.\n2. For each test pattern (0xAAAAAAAA, 0x55555555, 0xFFFFFFFF, 0x00000000), write to writable addresses (per write_mask_array).\n3. Read back each addressed register and compute expected using (data_wr & write_mask_array) | (~write_mask_array & default_value_array).\n4. Increment failure counters and log CFG_RST_FAIL/CFG_WR_FAIL on mismatches.\n5. Call finish(0) if no failures; otherwise call finish(1).",
+      "Impacted Registers": "VENDOR_DEVICE_ID, STATUS_COMMAND, CLASSCODE, BAR0, INT_PIN",
+      "Validation / Acceptance Criteria": "Pass if def_fail_cnt == 0 and wr_fail_cnt == 0; no logs containing \"CFG_RST_FAIL\" or \"CFG_WR_FAIL\"; finish(0) is called.",
+      "Gap Analysis": "- Default values are hardcoded to 0; true reset defaults are not validated.\n- No error handling around read_reg/write_reg operations.\n- Limited pattern coverage; no random or walking patterns.",
+      "Source File Path": "TestRepo/pcie/pcie_cfg_wr_rd_test/pcie_cfg_wr_rd_test.c"
+    },
+    {
+      "Index": "2",
+      "IP_NAME": "PCIE",
+      "SS / Module": "PCIE DBI DSP Registers",
+      "Feature": "dbi_dsp_reg_wr_rd",
+      "Test Case Name": "pcie_dbi_dsp_reg_wr_rd_test",
+      "Test Description": "Verify default values and basic read/write for DBI DSP registers.",
+      "Speed": "NA",
+      "Mode": "NA",
+      "Remarks": "Writes to all addresses without RO masking; skip_array not used.",
+      "Test Steps / Procedure": "1. Read each DSP register and compare to default_value_array.\n2. For each pattern (0xAAAAAAAA, 0x55555555, 0x00000000), write the value to all registers.\n3. Read back each register and compare to the last written pattern.\n4. Increment def_fail_cnt or wr_fail_cnt and log DSP_RST_FAIL/DSP_WR_FAIL on mismatches.\n5. Call finish(0) if no failures; otherwise call finish(1).",
+      "Impacted Registers": "CMD_STATUS, CFG_SETUP, OB_SIZE, IRQ_EOI",
+      "Validation / Acceptance Criteria": "Pass if def_fail_cnt == 0 and wr_fail_cnt == 0; no logs containing \"DSP_RST_FAIL\" or \"DSP_WR_FAIL\"; finish(0) is called.",
+      "Gap Analysis": "- No read/write masks or RO handling; potential false failures on RO fields.\n- Default values hardcoded to 0; true reset defaults not validated.",
+      "Source File Path": "TestRepo/pcie/pcie_dbi_dsp_reg_wr_rd_test/pcie_dbi_dsp_reg_wr_rd_test.c"
+    },
+    {
+      "Index": "3",
+      "IP_NAME": "PCIE",
+      "SS / Module": "PCIE DBI USP Registers",
+      "Feature": "dbi_usp_reg_wr_rd",
+      "Test Case Name": "pcie_dbi_usp_reg_wr_rd_test",
+      "Test Description": "Verify default values and read/write for DBI USP GPR registers.",
+      "Speed": "NA",
+      "Mode": "NA",
+      "Remarks": "Single write pattern used; no RO masking.",
+      "Test Steps / Procedure": "1. Read GPR registers and compare to default_value_array.\n2. Write 0xA5A5A5A5 to each GPR register.\n3. Read back each register and compare to 0xA5A5A5A5.\n4. Increment def_fail_cnt or wr_fail_cnt on mismatches.\n5. Call finish(0) if no failures; otherwise call finish(1).",
+      "Impacted Registers": "GPR0, GPR1, GPR2",
+      "Validation / Acceptance Criteria": "Pass if def_fail_cnt == 0 and wr_fail_cnt == 0; finish(0) is called.",
+      "Gap Analysis": "- No masking for RO or reserved bits; may not reflect true HW constraints.\n- Only one write pattern; limited data pattern coverage.",
+      "Source File Path": "TestRepo/pcie/pcie_dbi_usp_reg_wr_rd_test/pcie_dbi_usp_reg_wr_rd_test.c"
+    },
+    {
+      "Index": "4",
+      "IP_NAME": "PCIE",
+      "SS / Module": "PCIE SII RC Registers",
+      "Feature": "sii_rc_reg_wr_rd",
+      "Test Case Name": "pcie_sii_rc_reg_wr_rd_test",
+      "Test Description": "Verify default values and read/write for SII Root Complex inbound address registers.",
+      "Speed": "NA",
+      "Mode": "NA",
+      "Remarks": "Two write patterns; no RO masking.",
+      "Test Steps / Procedure": "1. Read each SII RC register and compare to default_value_array.\n2. For each pattern (0xFFFFFFFF, 0x00000000), write the value to all registers.\n3. Read back each register and compare to the last written pattern.\n4. Increment def_fail_cnt or wr_fail_cnt on mismatches.\n5. Call finish(0) if no failures; otherwise call finish(1).",
+      "Impacted Registers": "IB_BAR0, IB_START_LO, IB_OFFSET",
+      "Validation / Acceptance Criteria": "Pass if def_fail_cnt == 0 and wr_fail_cnt == 0; finish(0) is called.",
+      "Gap Analysis": "- No handling for RO fields or field-level masks.\n- Limited pattern set; does not test address alignment or partial-width writes.",
+      "Source File Path": "TestRepo/pcie/pcie_sii_rc_reg_wr_rd_test/pcie_sii_rc_reg_wr_rd_test.c"
+    }
+  ],
+  "errors": []
+}

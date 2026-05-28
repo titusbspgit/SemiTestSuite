@@ -1,110 +1,83 @@
 #!/usr/bin/env python3
 import json
-import sys
 import os
 from pathlib import Path
-from datetime import datetime
-try:
-    from zoneinfo import ZoneInfo
-except Exception:
-    ZoneInfo = None
-
 from openpyxl import Workbook
 from openpyxl.styles import Font
+from openpyxl.utils import get_column_letter
 
-REQUIRED_COLUMNS = [
-    "Index",
-    "SS / Module",
-    "Feature",
-    "Test Case Name",
-    "Test Description",
-    "Speed",
-    "Mode",
-    "Remarks",
-    "Test Steps / Procedure",
-    "Impacted Registers",
-    "Validation / Acceptance Criteria",
-    "Gap Analysis",
-]
+REPO_ROOT = Path(__file__).resolve().parents[1]
+INPUT_JSON = REPO_ROOT / 'Test_Output' / 'PCIE' / 'pcie_testplan_input.json'
+OUTPUT_XLSX = REPO_ROOT / 'Test_Output' / 'PCIE' / 'PCIE_TestPlan.xlsx'
+SHEET_NAME = 'TestPlan'
 
 
-def load_json(json_path: Path):
-    with open(json_path, 'r', encoding='utf-8') as f:
-        obj = json.load(f)
-    # Accept either a list directly or an object with key 'data'
-    if isinstance(obj, list):
-        data = obj
-    elif isinstance(obj, dict) and isinstance(obj.get('data'), list):
-        data = obj['data']
-    else:
-        raise ValueError("Invalid json_data: expected array or object with key 'data' as array")
-    # Validate rows are objects
-    for i, row in enumerate(data, start=1):
-        if not isinstance(row, dict):
-            raise ValueError(f"Invalid row at index {i}: expected object, got {type(row)}")
-    return data
-
-
-def autosize_columns(ws):
-    for col_cells in ws.columns:
+def autosize(ws):
+    # Compute max length per column and set width with padding
+    for col_idx, column_cells in enumerate(ws.iter_cols(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column), start=1):
         max_length = 0
-        col_letter = col_cells[0].column_letter
-        for cell in col_cells:
-            try:
-                val = "" if cell.value is None else str(cell.value)
-            except Exception:
-                val = ""
-            if len(val) > max_length:
-                max_length = len(val)
-        # add padding
-        ws.column_dimensions[col_letter].width = min(80, max(10, max_length + 2))
-
-
-def make_workbook(rows):
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "TestPlan"
-
-    # Header
-    header_font = Font(bold=True)
-    ws.append(REQUIRED_COLUMNS)
-    for cell in ws[1]:
-        cell.font = header_font
-    ws.freeze_panes = "A2"
-
-    # Rows in required order; fill missing keys with empty string
-    for r in rows:
-        ws.append([r.get(col, "") for col in REQUIRED_COLUMNS])
-
-    autosize_columns(ws)
-    return wb
-
-
-def ensure_dir(p: Path):
-    p.mkdir(parents=True, exist_ok=True)
+        for cell in column_cells:
+            val = cell.value
+            if val is None:
+                length = 0
+            else:
+                s = str(val)
+                # Limit the measured length to avoid extremely wide columns
+                length = min(len(s), 120)
+            if length > max_length:
+                max_length = length
+        adjusted = max_length + 2
+        ws.column_dimensions[get_column_letter(col_idx)].width = adjusted
 
 
 def main():
-    json_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path('Test_Output/GPIO/testplan_input.json')
-    out_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else Path('Test_Output/GPIO')
+    # Ensure directory exists
+    OUTPUT_XLSX.parent.mkdir(parents=True, exist_ok=True)
 
-    rows = load_json(json_path)
+    with open(INPUT_JSON, 'r', encoding='utf-8') as f:
+        payload = json.load(f)
 
-    wb = make_workbook(rows)
+    # Validate JSON: must contain key 'data' as a list
+    if not isinstance(payload, dict) or 'data' not in payload or not isinstance(payload['data'], list):
+        raise SystemExit('Invalid input JSON: expected object with key "data" as an array')
 
-    # Timestamp in IST
-    if ZoneInfo is not None:
-        now_ist = datetime.now(ZoneInfo("Asia/Kolkata"))
+    rows = payload['data']
+    if len(rows) == 0:
+        # Create empty workbook with just headers? With no rows we cannot infer columns.
+        # Use default 12-column TestPlan headers.
+        headers = [
+            'Index', 'SS / Module', 'Feature', 'Test Case Name', 'Test Description',
+            'Speed', 'Mode', 'Remarks', 'Test Steps / Procedure', 'Impacted Registers',
+            'Validation / Acceptance Criteria', 'Gap Analysis'
+        ]
     else:
-        # Fallback to UTC if zoneinfo unavailable (rare on GH runners); label remains deterministic format
-        now_ist = datetime.utcnow()
-    ts = now_ist.strftime("%Y%m%d_%H%M%S")
-    filename = f"testplan_{ts}.xlsx"
+        # Preserve the key order from the first row
+        # Python 3.7+ preserves dict insertion order
+        headers = list(rows[0].keys())
 
-    ensure_dir(out_dir)
-    out_path = out_dir / filename
-    wb.save(out_path)
-    print(f"Wrote {out_path}")
+    wb = Workbook()
+    ws = wb.active
+    ws.title = SHEET_NAME
+
+    # Write header row with bold font
+    bold = Font(bold=True)
+    for col_idx, h in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=h)
+        cell.font = bold
+
+    # Write data rows preserving order
+    for r_idx, row in enumerate(rows, start=2):
+        for c_idx, h in enumerate(headers, start=1):
+            ws.cell(row=r_idx, column=c_idx, value=row.get(h, ''))
+
+    # Freeze top row
+    ws.freeze_panes = 'A2'
+
+    # Auto-size columns
+    autosize(ws)
+
+    # Save as real .xlsx
+    wb.save(OUTPUT_XLSX)
 
 
 if __name__ == '__main__':
