@@ -1,0 +1,17 @@
+[
+  {
+    "id": "PCIE-TC-0001",
+    "title": "Placeholder - Workflow Validation",
+    "description": "Auto-generated placeholder test case to validate the Repo->Extract->Excel->Push workflow for PCIE.",
+    "component": "PCIE",
+    "priority": "Medium",
+    "preconditions": "Repo structure scanned; extractor currently unavailable.",
+    "steps": "1) Initialize environment; 2) Trigger test plan generation; 3) Verify artifacts are committed.",
+    "expected_result": "Test plan JSON and Excel are present at Test_Output/PCIE with valid structure.",
+    "tags": ["workflow", "placeholder"],
+    "source_path": "TestRepo/pcie",
+    "requirement_links": [],
+    "automation_status": "Candidate",
+    "owner": ""
+  }
+]
