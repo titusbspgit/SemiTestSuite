@@ -1,14 +1,89 @@
 #!/usr/bin/env python3
-import json
-import os
-from pathlib import Path
-from openpyxl import Workbook
-from openpyxl.styles import Font
+# Ag-Emb-Testsuite-Excel-Generator Agent fallback script
+# Purpose: Convert embedded Test Plan JSON into a REAL .xlsx (not CSV) and save to the specified output directory.
+# Requirements implemented:
+# - Creates a single sheet named "TestPlan" by default (can be overridden by SHEET_NAME env var)
+# - Header row is bold
+# - First row is frozen
+# - Filename pattern: testplan_<YYYYMMDD_HHMMSS>.xlsx (IST time)
 
-# Constants
-OUTPUT_PATH = Path("Test_Output/GPIO/TestPlan.xlsx")
-SHEET_NAME = "TestPlan"
-HEADERS = [
+from __future__ import annotations
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from pathlib import Path
+import os
+from typing import List, Dict, Any
+
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+except Exception as e:
+    raise SystemExit(f"openpyxl is required. Install with: pip install openpyxl. Error: {e}")
+
+# ========= Embedded JSON data (exact, no modification) =========
+JSON_DATA: List[Dict[str, Any]] = [
+    {
+      "Index": "1",
+      "SS / Module": "PCIE",
+      "Feature": "pcie_cfg_wr_rd_test",
+      "Test Case Name": "pcie_cfg_wr_rd_test",
+      "Test Description": "NA",
+      "Speed": "NA",
+      "Mode": "NA",
+      "Remarks": "NA",
+      "Test Steps / Procedure": "NA",
+      "Imparted Registers": "NA",  # Will ensure correct header mapping below
+      "Impacted Registers": "NA",
+      "Validation / Acceptance Criteria": "NA",
+      "Gap Analysis": "NA"
+    },
+    {
+      "Index": "2",
+      "SS / Module": "PCIE",
+      "Feature": "pcie_dbi_dsp_reg_wr_rd_test",
+      "Test Case Name": "pcie_dbi_dsp_reg_wr_rd_test",
+      "Test Description": "NA",
+      "Speed": "NA",
+      "Mode": "NA",
+      "Remarks": "NA",
+      "Test Steps / Procedure": "NA",
+      "Impacted Registers": "NA",
+      "Validation / Acceptance Criteria": "NA",
+      "Gap Analysis": "NA"
+    },
+    {
+      "Index": "3",
+      "SS / Module": "PCIE",
+      "Feature": "pcie_dbi_usp_reg_wr_rd_test",
+      "Test Case Name": "pcie_dbi_usp_reg_wr_rd_test",
+      "Test Description": "NA",
+      "Speed": "NA",
+      "Mode": "NA",
+      "Remarks": "NA",
+      "Test Steps / Procedure": "NA",
+      "Impacted Registers": "NA",
+      "Validation / Acceptance Criteria": "NA",
+      "Gap Analysis": "NA"
+    },
+    {
+      "Index": "4",
+      "SS / Module": "PCIE",
+      "Feature": "pcie_sii_rc_reg_wr_rd_test",
+      "Test Case Name": "pcie_sii_rc_reg_wr_rd_test",
+      "Test Description": "NA",
+      "Speed": "NA",
+      "Mode": "NA",
+      "Remarks": "NA",
+      "Test Steps / Procedure": "NA",
+      "Impacted Registers": "NA",
+      "Validation / Acceptance Criteria": "NA",
+      "Gap Analysis": "NA"
+    }
+]
+# ===============================================================
+
+# Required column order
+COLUMNS: List[str] = [
     "Index",
     "SS / Module",
     "Feature",
@@ -24,77 +99,54 @@ HEADERS = [
 ]
 
 
-def to_text(value):
-    if value is None:
-        return ""
-    if isinstance(value, (list, tuple)):
-        return "\n".join(str(v) for v in value)
-    return str(value)
+def main() -> None:
+    # STEP 1 — Validate JSON
+    if not isinstance(JSON_DATA, list):
+        raise SystemExit("json_data must be an array of objects")
+    for i, row in enumerate(JSON_DATA, start=1):
+        if not isinstance(row, dict):
+            raise SystemExit(f"Each item must be an object. Invalid at index {i-1}")
 
-
-def format_steps(steps):
-    if steps is None:
-        return ""
-    if isinstance(steps, (list, tuple)):
-        # Preserve order; number steps
-        return "\n".join(f"{i+1}. {to_text(s)}" for i, s in enumerate(steps))
-    return to_text(steps)
-
-
-def main():
-    # Read consolidated JSON from repository root
-    input_file = Path("testplan_input.json")
-    if not input_file.exists():
-        raise SystemExit("Missing testplan_input.json at repo root. The workflow should have created it.")
-
-    with input_file.open("r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    # Validate structure
-    testcases = data.get("testcases", [])
-    if not isinstance(testcases, list):
-        raise SystemExit("Invalid JSON: 'testcases' must be a list")
-
-    # Prepare workbook
+    # STEP 2 — Create workbook and sheet
     wb = Workbook()
-    # Remove the default sheet to avoid duplicates
-    default_title = wb.active.title
     ws = wb.active
-    ws.title = SHEET_NAME
+    sheet_name = os.getenv("SHEET_NAME", "TestPlan")
+    ws.title = sheet_name
 
-    # Write headers with bold font
-    bold = Font(bold=True)
-    for col_idx, header in enumerate(HEADERS, start=1):
+    # Header row with bold font
+    bold_font = Font(bold=True)
+    for col_idx, header in enumerate(COLUMNS, start=1):
         cell = ws.cell(row=1, column=col_idx, value=header)
-        cell.font = bold
+        cell.font = bold_font
 
-    # Freeze header row
+    # Freeze first row
     ws.freeze_panes = "A2"
 
-    # Fill rows
-    ip_name_global = data.get("ip_name", "")
-    for i, t in enumerate(testcases, start=1):
-        row = [
-            i,  # Index
-            t.get("ip_name") or ip_name_global or "",  # SS / Module
-            to_text(t.get("feature", "")),  # Feature
-            to_text(t.get("name") or t.get("id") or ""),  # Test Case Name
-            to_text(t.get("description", "")),  # Test Description
-            to_text(t.get("speed", "")),  # Speed
-            to_text(t.get("mode", "")),  # Mode
-            to_text(t.get("remarks", "")),  # Remarks
-            format_steps(t.get("steps")),  # Test Steps / Procedure
-            to_text(t.get("impacted_registers", "")),  # Impacted Registers
-            to_text(t.get("expected_result", "")),  # Validation / Acceptance Criteria
-            to_text(t.get("gap_analysis", "")),  # Gap Analysis
-        ]
-        for col_idx, value in enumerate(row, start=1):
-            ws.cell(row=i + 1, column=col_idx, value=value)
+    # STEP 3 — Write rows
+    row_idx = 2
+    for row in JSON_DATA:
+        # Ensure exact preservation; use None for missing keys
+        for col_idx, header in enumerate(COLUMNS, start=1):
+            value = row.get(header, None)
+            ws.cell(row=row_idx, column=col_idx, value=value)
+        row_idx += 1
 
-    # Ensure directory exists and save a REAL .xlsx workbook
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    wb.save(str(OUTPUT_PATH))
-    print(f"Saved Excel to {OUTPUT_PATH}")
+    # Ensure output directory exists
+    output_dir = os.getenv("OUTPUT_DIR", "Test_Output/GPIO")
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    # Filename with IST timestamp
+    ist_now = datetime.now(ZoneInfo("Asia/Kolkata"))
+    ts = ist_now.strftime("%Y%m%d_%H%M%S")
+    filename = f"testplan_{ts}.xlsx"
+    fullpath = out_path / filename
+
+    # Save as REAL .xlsx
+    wb.save(fullpath)
+
+    # Print path for CI logs/consumers
+    print(str(fullpath))
 
 
 if __name__ == "__main__":
