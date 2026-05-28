@@ -1,0 +1,118 @@
+name: Generate TestPlan Excel
+
+on:
+  workflow_dispatch:
+    inputs:
+      json_url:
+        description: 'Raw GitHub URL (raw.githubusercontent.com) to the Test Plan JSON array'
+        required: false
+        type: string
+      json_inline:
+        description: 'Inline JSON array (paste the entire array)'
+        required: false
+        type: string
+      output_directory:
+        description: 'Output directory for the Excel file'
+        required: false
+        default: 'Test_Output/GPIO'
+        type: string
+      branch:
+        description: 'Branch to push the generated Excel to'
+        required: false
+        default: 'main'
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || 'main' }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install openpyxl requests
+
+      - name: Prepare JSON file
+        shell: bash
+        run: |
+          set -e
+          mkdir -p tmp
+          if [ -n "${{ github.event.inputs.json_url }}" ]; then
+            python - << 'PY'
+import requests, json, sys
+url = "${{ github.event.inputs.json_url }}".strip()
+if not url:
+    print('ERROR: json_url is empty', file=sys.stderr); sys.exit(1)
+r = requests.get(url, timeout=60)
+r.raise_for_status()
+try:
+    data = r.json()
+except Exception as e:
+    print(f'ERROR: Response is not valid JSON: {e}', file=sys.stderr); sys.exit(2)
+if not isinstance(data, list):
+    print('ERROR: JSON must be an array of objects', file=sys.stderr); sys.exit(3)
+for i, row in enumerate(data):
+    if not isinstance(row, dict):
+        print(f'ERROR: Element {i} is not an object', file=sys.stderr); sys.exit(4)
+open('tmp/testplan.json','w', encoding='utf-8').write(json.dumps(data, ensure_ascii=False))
+print('Saved tmp/testplan.json')
+PY
+          elif [ -n "${{ github.event.inputs.json_inline }}" ]; then
+            python - << 'PY'
+import json, sys
+raw = r"""${{ github.event.inputs.json_inline }}"""
+try:
+    data = json.loads(raw)
+except Exception as e:
+    print(f'ERROR: json_inline is not valid JSON: {e}', file=sys.stderr); sys.exit(1)
+if not isinstance(data, list):
+    print('ERROR: JSON must be an array of objects', file=sys.stderr); sys.exit(2)
+for i, row in enumerate(data):
+    if not isinstance(row, dict):
+        print(f'ERROR: Element {i} is not an object', file=sys.stderr); sys.exit(3)
+open('tmp/testplan.json','w', encoding='utf-8').write(json.dumps(data, ensure_ascii=False))
+print('Saved tmp/testplan.json')
+PY
+          else
+            echo 'ERROR: Provide either json_url or json_inline' >&2
+            exit 1
+          fi
+
+      - name: Generate Excel
+        run: |
+          python scripts/generate_testplan_xlsx.py --json-path tmp/testplan.json --output-dir "${{ github.event.inputs.output_directory || 'Test_Output/GPIO' }}"
+
+      - name: Commit Excel
+        shell: bash
+        run: |
+          set -e
+          BRANCH="${{ github.event.inputs.branch || 'main' }}"
+          DIR="${{ github.event.inputs.output_directory || 'Test_Output/GPIO' }}"
+          FILEPATH=$(ls "$DIR"/testplan_*.xlsx | sort | tail -n1)
+          echo "Generated: $FILEPATH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$FILEPATH"
+          if git diff --cached --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git commit -m "Added generated TestPlan Excel"
+          git push origin "HEAD:$BRANCH"
+
+      - name: Show output path
+        run: |
+          echo "Output dir: ${{ github.event.inputs.output_directory || 'Test_Output/GPIO' }}"
+          ls -l "${{ github.event.inputs.output_directory || 'Test_Output/GPIO' }}" || true
