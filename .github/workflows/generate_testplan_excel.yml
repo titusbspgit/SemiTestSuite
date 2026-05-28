@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -23,9 +25,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install openpyxl
 
-      - name: Write consolidated JSON input
+      - name: Write Test Plan input JSON
+        shell: bash
         run: |
-          cat > testplan_input.json << 'JSON_EOF'
+          cat > testplan_input.json << 'JSON'
           {
             "ip_name": "GPIO",
             "source_folders": [
@@ -74,28 +77,21 @@ jobs:
               }
             ]
           }
-          JSON_EOF
+          JSON
 
-      - name: Ensure output directory exists
+      - name: Generate Excel from JSON
         run: |
-          mkdir -p Test_Output/GPIO
-
-      - name: Generate Excel
-        run: |
-          python scripts/generate_testplan_excel.py \
-            --input testplan_input.json \
-            --output-dir Test_Output/GPIO \
-            --ip-name GPIO
+          python scripts/generate_testplan_excel.py
 
       - name: Commit and push Excel
+        shell: bash
         run: |
-          set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Test_Output/GPIO/*.xlsx || true
-          if git diff --cached --quiet; then
-            echo "No Excel changes to commit."
-          else
+          git add Test_Output/GPIO/TestPlan.xlsx
+          if ! git diff --cached --quiet; then
             git commit -m "Add GPIO TestPlan.xlsx generated from TestRepo/gpio"
-            git push
+            git push origin HEAD:main
+          else
+            echo "No changes to commit."
           fi
