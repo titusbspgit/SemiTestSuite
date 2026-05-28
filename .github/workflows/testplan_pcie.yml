@@ -1,0 +1,33 @@
+name: Generate PCIE TestPlan.xlsx
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/generate_pcie_testplan_excel.py'
+      - 'data/testplans/PCIE_testplan_consolidated.json'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install openpyxl
+      - name: Generate Excel
+        run: python scripts/generate_pcie_testplan_excel.py
+      - name: Commit Excel
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Add/Update PCIE TestPlan.xlsx
+          file_pattern: Test_Output/PCIE/TestPlan.xlsx
+          commit_user_name: Automation Bot
+          commit_user_email: automation-bot@users.noreply.github.com
+          branch: ${{ github.ref_name }}
