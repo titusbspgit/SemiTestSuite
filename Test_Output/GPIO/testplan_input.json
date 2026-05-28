@@ -1,5 +1,6 @@
 {
   "status": "SUCCESS",
+  "automation_trigger": "run_1",
   "data": [
     {
       "Index": "1",
