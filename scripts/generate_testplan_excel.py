@@ -56,7 +56,7 @@ def autosize(ws):
 def build_workbook(rows):
     wb = Workbook()
     ws = wb.active
-    ws.title = "TestPlan"
+    ws.title = "PCIE_TestPlan"
     ws.append(COLUMNS)
     for cell in ws[1]:
         cell.font = Font(bold=True)

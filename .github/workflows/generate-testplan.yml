@@ -35,7 +35,7 @@ jobs:
           git config user.email "automation-bot@users.noreply.github.com"
           if ls Test_Output/PCIE/testplan_*.xlsx 1> /dev/null 2>&1; then
             git add Test_Output/PCIE/testplan_*.xlsx
-            git commit -m "Added generated TestPlan Excel [skip ci]" || echo "Nothing to commit"
+            git commit -m "Add PCIE TestPlan.xlsx generated from TestRepo/pcie" || echo "Nothing to commit"
             git push
           else
             echo "No Excel files generated."
