@@ -34,7 +34,7 @@ jobs:
           OUTPUT_DIR: Test_Output/GPIO
           SHEET_NAME: TestPlan
         run: |
-          python scripts/ggenerate_testplan_excel.py || python scripts/generate_testplan_excel.py
+          python scripts/generate_testplan_excel.py
 
       - name: Commit and push generated Excel
         env:

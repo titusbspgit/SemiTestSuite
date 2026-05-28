@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # Ag-Emb-Testsuite-Excel-Generator Agent fallback script
 # Purpose: Convert embedded Test Plan JSON into a REAL .xlsx (not CSV) and save to the specified output directory.
-# Requirements implemented:
-# - Creates a single sheet named "TestPlan" by default (can be overridden by SHEET_NAME env var)
-# - Header row is bold
-# - First row is frozen
+# Implements:
+# - Single sheet named by SHEET_NAME (default: "TestPlan")
+# - Bold header row
+# - Freeze first row
 # - Filename pattern: testplan_<YYYYMMDD_HHMMSS>.xlsx (IST time)
 
 from __future__ import annotations
@@ -32,7 +32,6 @@ JSON_DATA: List[Dict[str, Any]] = [
       "Mode": "NA",
       "Remarks": "NA",
       "Test Steps / Procedure": "NA",
-      "Imparted Registers": "NA",  # Will ensure correct header mapping below
       "Impacted Registers": "NA",
       "Validation / Acceptance Criteria": "NA",
       "Gap Analysis": "NA"
@@ -125,7 +124,6 @@ def main() -> None:
     # STEP 3 — Write rows
     row_idx = 2
     for row in JSON_DATA:
-        # Ensure exact preservation; use None for missing keys
         for col_idx, header in enumerate(COLUMNS, start=1):
             value = row.get(header, None)
             ws.cell(row=row_idx, column=col_idx, value=value)
