@@ -1,0 +1,269 @@
+{
+  "testcases": [
+    {
+      "test_id": "test_case",
+      "name": "pcie_cfg_wr_rd_test",
+      "title": "PCIe config registers default and masked read/write verification",
+      "description": "Verifies default reset values and masked read/write behavior for PCIe configuration space registers.",
+      "preconditions": "NA",
+      "steps": [
+        "Read each register in addr_array and compare with default_value_array using read_mask_array.",
+        "Record a failure if any default value mismatches.",
+        "Iterate write patterns 0xAAAAAAAA, 0x55555555, 0xFFFFFFFF, 0x00000000.",
+        "For each pattern, write to each register where write_mask_array != 0 and not skipped.",
+        "Read back each register where read_mask_array != 0 and compare against expected masked value.",
+        "Pass if def_fail_cnt == 0 and wr_fail_cnt == 0; otherwise fail."
+      ],
+      "expected_result": "Test passes when finish(0) is called: all default reads match defaults and all readbacks equal ((data_wr & write_mask) | (~write_mask & default)). Failures print CFG_RST_FAIL or CFG_WR_FAIL and call finish(1).",
+      "inputs": {
+        "addr_array_hex": [
+          "0x1000",
+          "0x1004",
+          "0x1008",
+          "0x1010",
+          "0x103C"
+        ],
+        "addr_names": [
+          "VENDOR_DEVICE_ID",
+          "STATUS_COMMAND",
+          "CLASSCODE",
+          "BAR0",
+          "INT_PIN"
+        ],
+        "default_value_array_hex": [
+          "0x00000000",
+          "0x00000000",
+          "0x00000000",
+          "0x00000000",
+          "0x00000000"
+        ],
+        "read_mask_array_hex": [
+          "0xFFFFFFFF",
+          "0xFFFFFFFF",
+          "0xFFFFFFFF",
+          "0xFFFFFFFF",
+          "0x000000FF"
+        ],
+        "write_mask_array_hex": [
+          "0x00000000",
+          "0xFFFFFFFF",
+          "0xFFFFFFFF",
+          "0xFFFFFFF0",
+          "0x00000000"
+        ],
+        "skip_array": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "write_patterns_hex": [
+          "0xAAAAAAAA",
+          "0x55555555",
+          "0xFFFFFFFF",
+          "0x00000000"
+        ]
+      },
+      "tags": "NA",
+      "priority": "NA",
+      "owner": "NA",
+      "component": "PCIE",
+      "source_file": "TestRepo/pcie/pcie_cfg_wr_rd_test/pcie_cfg_wr_rd_test.c",
+      "line_numbers": "NA",
+      "suite": "TestRepo/pcie/pcie_cfg_wr_rd_test"
+    },
+    {
+      "test_id": "test_case",
+      "name": "pcie_dbi_dsp_reg_wr_rd_test",
+      "title": "PCIe DBI DSP register read/write verification",
+      "description": "Checks default values and verifies direct read/write integrity for DSP DBI registers.",
+      "preconditions": "NA",
+      "steps": [
+        "Read each DSP register in addr_array and compare with default_value_array.",
+        "Record a failure if any default value mismatches.",
+        "Iterate write patterns 0xAAAAAAAA, 0x55555555, 0x00000000.",
+        "Write pattern to each DSP register.",
+        "Read back each register and compare to the written value.",
+        "Pass if def_fail_cnt == 0 and wr_fail_cnt == 0; otherwise fail."
+      ],
+      "expected_result": "All readbacks equal the last written pattern; failures print DSP_RST_FAIL or DSP_WR_FAIL. finish(0) on success, finish(1) on failure.",
+      "inputs": {
+        "addr_array_hex": [
+          "0x004",
+          "0x008",
+          "0x030",
+          "0x050"
+        ],
+        "addr_names": [
+          "CMD_STATUS",
+          "CFG_SETUP",
+          "OB_SIZE",
+          "IRQ_EOI"
+        ],
+        "default_value_array_hex": [
+          "0x00000000",
+          "0x00000000",
+          "0x00000000",
+          "0x00000000"
+        ],
+        "read_mask_array_hex": [
+          "0xFFFFFFFF",
+          "0xFFFFFFFF",
+          "0xFFFFFFFF",
+          "0xFFFFFFFF"
+        ],
+        "write_mask_array_hex": [
+          "0xFFFFFFFF",
+          "0xFFFFFFFF",
+          "0xFFFFFFFF",
+          "0xFFFFFFFF"
+        ],
+        "skip_array": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "write_patterns_hex": [
+          "0xAAAAAAAA",
+          "0x55555555",
+          "0x00000000"
+        ]
+      },
+      "tags": "NA",
+      "priority": "NA",
+      "owner": "NA",
+      "component": "PCIE",
+      "source_file": "TestRepo/pcie/pcie_dbi_dsp_reg_wr_rd_test/pcie_dbi_dsp_reg_wr_rd_test.c",
+      "line_numbers": "NA",
+      "suite": "TestRepo/pcie/pcie_dbi_dsp_reg_wr_rd_test"
+    },
+    {
+      "test_id": "test_case",
+      "name": "pcie_dbi_usp_reg_wr_rd_test",
+      "title": "PCIe DBI USP GPR register read/write verification",
+      "description": "Verifies default values and fixed-pattern read/write integrity for USP general purpose registers.",
+      "preconditions": "NA",
+      "steps": [
+        "Read each USP register in addr_array and compare with default_value_array.",
+        "Record a failure if any default value mismatches.",
+        "Write fixed pattern 0xA5A5A5A5 to each register.",
+        "Read back each register and compare to 0xA5A5A5A5.",
+        "Pass if def_fail_cnt == 0 and wr_fail_cnt == 0; otherwise fail."
+      ],
+      "expected_result": "All readbacks equal 0xA5A5A5A5; finish(0) on success, finish(1) on failure.",
+      "inputs": {
+        "addr_array_hex": [
+          "0x070",
+          "0x074",
+          "0x078"
+        ],
+        "addr_names": [
+          "GPR0",
+          "GPR1",
+          "GPR2"
+        ],
+        "default_value_array_hex": [
+          "0x00000000",
+          "0x00000000",
+          "0x00000000"
+        ],
+        "read_mask_array_hex": [
+          "0xFFFFFFFF",
+          "0xFFFFFFFF",
+          "0xFFFFFFFF"
+        ],
+        "write_mask_array_hex": [
+          "0xFFFFFFFF",
+          "0xFFFFFFFF",
+          "0xFFFFFFFF"
+        ],
+        "skip_array": [
+          0,
+          0,
+          0
+        ],
+        "write_patterns_hex": [
+          "0xA5A5A5A5"
+        ]
+      },
+      "tags": "NA",
+      "priority": "NA",
+      "owner": "NA",
+      "component": "PCIE",
+      "source_file": "TestRepo/pcie/pcie_dbi_usp_reg_wr_rd_test/pcie_dbi_usp_reg_wr_rd_test.c",
+      "line_numbers": "NA",
+      "suite": "TestRepo/pcie/pcie_dbi_usp_reg_wr_rd_test"
+    },
+    {
+      "test_id": "test_case",
+      "name": "pcie_sii_rc_reg_wr_rd_test",
+      "title": "PCIe SII RC inbound register read/write verification",
+      "description": "Verifies default values and read/write behavior for SII RC inbound address mapping registers.",
+      "preconditions": "NA",
+      "steps": [
+        "Read each SII RC register in addr_array and compare with default_value_array.",
+        "Record a failure if any default value mismatches.",
+        "Iterate write patterns 0xFFFFFFFF and 0x00000000.",
+        "Write pattern to each register.",
+        "Read back each register and compare to the written value.",
+        "Pass if def_fail_cnt == 0 and wr_fail_cnt == 0; otherwise fail."
+      ],
+      "expected_result": "All readbacks equal the written pattern; finish(0) on success, finish(1) on failure.",
+      "inputs": {
+        "addr_array_hex": [
+          "0x300",
+          "0x304",
+          "0x30C"
+        ],
+        "addr_names": [
+          "IB_BAR0",
+          "IB_START_LO",
+          "IB_OFFSET"
+        ],
+        "default_value_array_hex": [
+          "0x00000000",
+          "0x00000000",
+          "0x00000000"
+        ],
+        "read_mask_array_hex": [
+          "0xFFFFFFFF",
+          "0xFFFFFFFF",
+          "0xFFFFFFFF"
+        ],
+        "write_mask_array_hex": [
+          "0xFFFFFFFF",
+          "0xFFFFFFFF",
+          "0xFFFFFFFF"
+        ],
+        "skip_array": [
+          0,
+          0,
+          0
+        ],
+        "write_patterns_hex": [
+          "0xFFFFFFFF",
+          "0x00000000"
+        ]
+      },
+      "tags": "NA",
+      "priority": "NA",
+      "owner": "NA",
+      "component": "PCIE",
+      "source_file": "TestRepo/pcie/pcie_sii_rc_reg_wr_rd_test/pcie_sii_rc_reg_wr_rd_test.c",
+      "line_numbers": "NA",
+      "suite": "TestRepo/pcie/pcie_sii_rc_reg_wr_rd_test"
+    }
+  ],
+  "summary": {
+    "total_testcases": 4,
+    "sources": [
+      "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/pcie/pcie_cfg_wr_rd_test",
+      "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/pcie/pcie_dbi_dsp_reg_wr_rd_test",
+      "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/pcie/pcie_dbi_usp_reg_wr_rd_test",
+      "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/pcie/pcie_sii_rc_reg_wr_rd_test"
+    ],
+    "generated_at_utc": "2026-06-01T06:42:30Z"
+  }
+}
