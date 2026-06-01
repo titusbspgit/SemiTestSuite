@@ -34,11 +34,18 @@ jobs:
         run: |
           python scripts/generate_testplan_xlsx.py
 
-      - name: Commit Excel artifact
+      - name: Create stable filename copy
+        run: |
+          latest=$(ls -t Test_Output/PCIE/testplan_*.xlsx | head -n1 || true)
+          if [ -z "$latest" ]; then
+            echo "No generated XLSX found"; exit 1; fi
+          cp "$latest" Test_Output/PCIE/TestPlan_PCIE.xlsx
+
+      - name: Commit Excel artifacts
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Test_Output/PCIE/testplan_*.xlsx
+          git add Test_Output/PCIE/testplan_*.xlsx Test_Output/PCIE/TestPlan_PCIE.xlsx
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
