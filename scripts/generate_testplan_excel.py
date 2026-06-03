@@ -5,21 +5,8 @@ import os
 import datetime
 from zoneinfo import ZoneInfo
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment
+from openpyxl.styles import Font
 
-HEADERS = [
-    "Index",
-    "SS / Module",
-    "Feature",
-    "Test Case Name",
-    "Test Description",
-    "Speed",
-    "Mode",
-    "Remarks",
-    "Test Steps / Procedure",
-    "Imparted Registers" if False else "Imparted Registers"  # placeholder to keep linter quiet
-]
-# Correct headers list
 HEADERS = [
     "Index",
     "SS / Module",
@@ -81,15 +68,6 @@ def main():
                 except Exception:
                     val = str(val)
             ws.cell(row=r_idx, column=c_idx, value=val)
-
-    # RawJSON sheet to preserve exact input
-    raw_ws = wb.create_sheet("RawJSON")
-    raw_ws.cell(row=1, column=1, value="Exact input JSON (chunked to avoid Excel cell limits):").font = Font(bold=True)
-    CHUNK = 30000
-    chunks = [raw[i:i + CHUNK] for i in range(0, len(raw), CHUNK)] or [""]
-    for i, chunk in enumerate(chunks, start=2):
-        cell = raw_ws.cell(row=i, column=1, value=chunk)
-        cell.alignment = Alignment(wrap_text=True)
 
     # Save with IST timestamp
     ts = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y%m%d_%H%M%S")
