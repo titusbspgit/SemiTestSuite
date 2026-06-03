@@ -1,102 +1,126 @@
 #include "pcie_cfg_wr_rd_test.h"
 #include <stdint.h>
-#include <stdio.h>
 
-/* Register map defines for this test case (deterministic placeholders) */
-#define REG_VENDOR_DEVICE_ID ((volatile uint32_t*)0x40000000u)
-#define REG_STATUS_COMMAND   ((volatile uint32_t*)0x40000100u)
-#define REG_CLASSCODE        ((volatile uint32_t*)0x40000200u)
-#define REG_BAR0             ((volatile uint32_t*)0x40000300u)
-#define REG_INT_PIN          ((volatile uint32_t*)0x40000400u)
+#ifndef PCIE_CFG_BASE
+#error "PCIE_CFG_BASE is not defined. Provide PCIe configuration space base address."
+#endif
 
-static inline void write_reg(volatile uint32_t* addr, uint32_t val){ *addr = val; }
-static inline uint32_t read_reg(volatile uint32_t* addr){ return *addr; }
+// Offsets from RAG
+#define VENDOR_DEVICE_ID_OFFSET   0x000u
+#define STATUS_COMMAND_OFFSET     0x004u
+#define CLASSCODE_OFFSET          0x008u
+#define BAR0_OFFSET               0x010u
+#define INT_PIN_OFFSET            0x03Du
+
+// Absolute register addresses (Base + Offset)
+#define BASE_ADDR_VENDOR_DEVICE_ID   (PCIE_CFG_BASE + VENDOR_DEVICE_ID_OFFSET)
+#define BASE_ADDR_STATUS_COMMAND     (PCIE_CFG_BASE + STATUS_COMMAND_OFFSET)
+#define BASE_ADDR_CLASSCODE          (PCIE_CFG_BASE + CLASSCODE_OFFSET)
+#define BASE_ADDR_BAR0               (PCIE_CFG_BASE + BAR0_OFFSET)
+#define BASE_ADDR_INT_PIN            (PCIE_CFG_BASE + INT_PIN_OFFSET)
+
+// Field masks from RAG bit positions
+// VENDOR_DEVICE_ID [31:16]=DEVICE_ID, [15:0]=VENDOR_ID
+#define VENDOR_DEVICE_ID_DEVICE_ID_MASK   0xFFFF0000u
+#define VENDOR_DEVICE_ID_VENDOR_ID_MASK   0x0000FFFFu
+#define VENDOR_DEVICE_ID_ALL_MASK        (VENDOR_DEVICE_ID_DEVICE_ID_MASK | VENDOR_DEVICE_ID_VENDOR_ID_MASK)
+
+// STATUS_COMMAND [31:16]=STATUS, [15:0]=COMMAND
+#define STATUS_COMMAND_STATUS_MASK        0xFFFF0000u
+#define STATUS_COMMAND_COMMAND_MASK       0x0000FFFFu
+#define STATUS_COMMAND_ALL_MASK          (STATUS_COMMAND_STATUS_MASK | STATUS_COMMAND_COMMAND_MASK)
+
+// CLASSCODE [31:24]=BASE_CLASS, [23:16]=SUB_CLASS, [15:8]=PROG_IF, [7:0]=REV_ID
+#define CLASSCODE_BASE_CLASS_MASK         0xFF000000u
+#define CLASSCODE_SUB_CLASS_MASK          0x00FF0000u
+#define CLASSCODE_PROG_IF_MASK            0x0000FF00u
+#define CLASSCODE_REV_ID_MASK             0x000000FFu
+#define CLASSCODE_ALL_MASK               (CLASSCODE_BASE_CLASS_MASK | CLASSCODE_SUB_CLASS_MASK | CLASSCODE_PROG_IF_MASK | CLASSCODE_REV_ID_MASK)
+
+// BAR0 fields
+// BASE_ADDR_MEM [31:4], PREFETCHABLE [3], TYPE [2:1], MEM_IO [0], BASE_ADDR_IO [31:2]
+#define BAR0_BASE_ADDR_MEM_MASK           0xFFFFFFF0u
+#define BAR0_PREFETCHABLE_MASK            0x00000008u
+#define BAR0_TYPE_MASK                    0x00000006u
+#define BAR0_MEM_IO_MASK                  0x00000001u
+#define BAR0_BASE_ADDR_IO_MASK            0xFFFFFFFCu
+#define BAR0_ALL_MASK                    (BAR0_BASE_ADDR_MEM_MASK | BAR0_PREFETCHABLE_MASK | BAR0_TYPE_MASK | BAR0_MEM_IO_MASK | BAR0_BASE_ADDR_IO_MASK)
+
+// INT_PIN [7:0]
+#define INT_PIN_INT_PIN_MASK              0x000000FFu
+#define INT_PIN_ALL_MASK                 (INT_PIN_INT_PIN_MASK)
+
+static inline void write_reg(uint32_t addr, uint32_t val)
+{
+    *(volatile uint32_t *)addr = val;
+}
+
+static inline uint32_t read_reg(uint32_t addr)
+{
+    return *(volatile uint32_t *)addr;
+}
 
 void pcie_cfg_wr_rd_test(void)
 {
-    // Trace start and parameters
-    printf("[TRACE] Start pcie_cfg_wr_rd_test\n");
-    printf("[TRACE] SS/Module: PCIE Config Registers, Feature: cfg_wr_rd\n");
-    printf("[TRACE] Description: Validate default reset values and masked read/write behavior for selected PCIe configuration registers.\n");
+    // Step 1: Enable clocks (platform-specific; not provided by RAG/Excel)
 
-    // Step 1: Enable clocks (placeholder ops)
-    printf("[TRACE] Step 1: Enable clocks\n");
-    // TODO: Implement platform-specific clock enabling if applicable
+    // Test patterns from Test Plan
+    static const uint32_t patterns[] = { 0xAAAAAAAAu, 0x55555555u, 0xFFFFFFFFu, 0x00000000u };
+    static const uint32_t num_patterns = sizeof(patterns) / sizeof(patterns[0]);
 
-    // Setup register list and masks per plan remarks
-    enum { NUM_REGS = 5 };
-    volatile uint32_t* regs[NUM_REGS] = {
-        REG_VENDOR_DEVICE_ID,
-        REG_STATUS_COMMAND,
-        REG_CLASSCODE,
-        REG_BAR0,
-        REG_INT_PIN
+    // Registers and masks strictly from RAG
+    static const uint32_t regs[]  = {
+        BASE_ADDR_VENDOR_DEVICE_ID,
+        BASE_ADDR_STATUS_COMMAND,
+        BASE_ADDR_CLASSCODE,
+        BASE_ADDR_BAR0,
+        BASE_ADDR_INT_PIN
     };
 
-    // Default reset values are hardcoded to 0 per Gap Analysis in the plan
-    const uint32_t default_value_array[NUM_REGS] = { 0, 0, 0, 0, 0 };
+    static const uint32_t masks[] = {
+        VENDOR_DEVICE_ID_ALL_MASK,
+        STATUS_COMMAND_ALL_MASK,
+        CLASSCODE_ALL_MASK,
+        BAR0_ALL_MASK,
+        INT_PIN_ALL_MASK
+    };
 
-    // Read and write masks (unknown per plan; use full-mask defaults deterministically)
-    const uint32_t read_mask_array[NUM_REGS]  = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
-    const uint32_t write_mask_array[NUM_REGS] = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
-    const uint8_t  skip_array[NUM_REGS]       = { 0u, 0u, 0u, 0u, 0u };
+    uint32_t def_fail_cnt = 0u;
+    uint32_t wr_fail_cnt  = 0u;
 
-    uint32_t def_fail_cnt = 0;
-    uint32_t wr_fail_cnt  = 0;
-
-    // Step 2: Configure registers (none required for basic config space access)
-    printf("[TRACE] Step 2: Configure registers (N/A for basic config access)\n");
-
-    // Step 3: Read each address and compare to default_value_array using read_mask_array
-    printf("[TRACE] Step 3: Validate reset/default values\n");
-    for (unsigned i = 0; i < NUM_REGS; ++i)
+    // Step 2: Read defaults (no golden defaults provided; capture for reference only)
+    for (unsigned i = 0; i < (sizeof(regs)/sizeof(regs[0])); ++i)
     {
-        uint32_t rd = read_reg(regs[i]);
-        uint32_t masked_rd = rd & read_mask_array[i];
-        uint32_t expected  = default_value_array[i] & read_mask_array[i];
-        if (masked_rd != expected)
-        {
-            ++def_fail_cnt;
-            printf("CFG_RST_FAIL idx=%u exp=0x%08X got=0x%08X mask=0x%08X\n", i, expected, masked_rd, read_mask_array[i]);
-        }
+        volatile uint32_t addr = regs[i];
+        (void)addr; // suppress unused warning if not used later
+        // Default comparison to a provided table is not possible without golden values.
+        // We do not increment def_fail_cnt due to lack of RAG-provided default values.
     }
 
-    // Step 4: Patterned writes to writable fields per write_mask_array
-    printf("[TRACE] Step 4: Patterned writes and readback\n");
-    const uint32_t patterns[] = { 0xAAAAAAAAu, 0x55555555u, 0xFFFFFFFFu, 0x00000000u };
-    for (unsigned p = 0; p < (sizeof(patterns)/sizeof(patterns[0])); ++p)
+    // Step 3/4: Write patterns and read back using field masks from RAG
+    for (unsigned i = 0; i < (sizeof(regs)/sizeof(regs[0])); ++i)
     {
-        uint32_t pat = patterns[p];
-        printf("[TRACE]  Write pattern 0x%08X\n", pat);
-        for (unsigned i = 0; i < NUM_REGS; ++i)
+        volatile uint32_t addr = regs[i];
+        uint32_t mask = masks[i];
+
+        for (unsigned p = 0; p < num_patterns; ++p)
         {
-            if (skip_array[i]) { continue; }
-            uint32_t data_wr = (pat & write_mask_array[i]) | (~write_mask_array[i] & default_value_array[i]);
-            write_reg(regs[i], data_wr);
-        }
-        // Readback and validate expected per masked model
-        for (unsigned i = 0; i < NUM_REGS; ++i)
-        {
-            if (skip_array[i]) { continue; }
-            uint32_t rd = read_reg(regs[i]);
-            uint32_t expected = (pat & write_mask_array[i]) | (~write_mask_array[i] & default_value_array[i]);
-            if (rd != expected)
+            uint32_t wr = patterns[p] & mask; // only affect documented field bits
+            write_reg(addr, wr);
+            uint32_t rd = read_reg(addr) & mask;
+
+            if (rd != wr)
             {
-                ++wr_fail_cnt;
-                printf("CFG_WR_FAIL idx=%u exp=0x%08X got=0x%08X mask=0x%08X\n", i, expected, rd, write_mask_array[i]);
+                wr_fail_cnt++;
             }
         }
     }
 
-    // Step 5: Validate cumulative results and pass/fail
-    printf("[TRACE] Step 5: Final validation: def_fail_cnt=%u, wr_fail_cnt=%u\n", def_fail_cnt, wr_fail_cnt);
+    // Step 5: Validate
     if ((def_fail_cnt != 0u) || (wr_fail_cnt != 0u))
     {
-        // Fail condition
-        printf("[RESULT] pcie_cfg_wr_rd_test: FAIL\n");
-        while(1) { /* trap on failure */ }
+        while(1);
     }
 
-    // Pass condition
-    printf("[RESULT] pcie_cfg_wr_rd_test: PASS\n");
+    // Pass condition reached
 }
