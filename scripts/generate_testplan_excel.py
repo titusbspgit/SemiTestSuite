@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
-import argparse
 import json
-import os
 import sys
-from datetime import datetime
-try:
-    from zoneinfo import ZoneInfo
-except Exception:  # Python <3.9 fallback if needed
-    ZoneInfo = None
-
+import os
+import datetime
+from zoneinfo import ZoneInfo
 from openpyxl import Workbook
-from openpyxl.styles import Font
+from openpyxl.styles import Font, Alignment
 
-REQUIRED_HEADERS = [
+HEADERS = [
     "Index",
     "SS / Module",
     "Feature",
@@ -22,135 +17,87 @@ REQUIRED_HEADERS = [
     "Mode",
     "Remarks",
     "Test Steps / Procedure",
-    "Imparted Registers" if False else "Impacted Registers",
+    "Imparted Registers" if False else "Imparted Registers"  # placeholder to keep linter quiet
+]
+# Correct headers list
+HEADERS = [
+    "Index",
+    "SS / Module",
+    "Feature",
+    "Test Case Name",
+    "Test Description",
+    "Speed",
+    "Mode",
+    "Remarks",
+    "Test Steps / Procedure",
+    "Impacted Registers",
     "Validation / Acceptance Criteria",
     "Gap Analysis",
 ]
 
-# Build normalized mapping for header detection
-import re
+def main():
+    input_path = os.environ.get("TESTPLAN_JSON_PATH", "input/TestPlan.json")
+    output_dir = os.environ.get("TESTPLAN_OUTPUT_DIR", "Test_Output/GPIO")
 
-def normalize_key(s: str) -> str:
-    return re.sub(r"[^a-z0-9]", "", s.lower())
-
-NORMALIZED_TO_HEADER = {normalize_key(h): h for h in REQUIRED_HEADERS}
-
-
-def to_cell_value(v):
-    if v is None:
-        return ""
-    if isinstance(v, (str, int, float)):
-        return v
-    if isinstance(v, bool):
-        return str(v)
-    # For lists/dicts/others, store JSON to preserve data exactly
     try:
-        return json.dumps(v, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    except Exception:
-        return str(v)
+        with open(input_path, "r", encoding="utf-8") as f:
+            raw = f.read()
+    except FileNotFoundError:
+        print(f"ERROR: Input JSON file not found at {input_path}", file=sys.stderr)
+        sys.exit(1)
 
+    try:
+        data = json.loads(raw)
+    except Exception as e:
+        print(f"ERROR: input JSON is invalid: {e}", file=sys.stderr)
+        sys.exit(1)
 
-def now_ist_timestamp():
-    if ZoneInfo is not None:
-        ts = datetime.now(ZoneInfo("Asia/Kolkata"))
-    else:
-        # Fallback: IST = UTC+5:30 (naive)
-        from datetime import timedelta, timezone
-        ts = datetime.now(timezone(timedelta(hours=5, minutes=30)))
-    return ts.strftime("%Y%m%d_%H%M%S")
+    if not isinstance(data, list):
+        print("ERROR: input JSON must be an array of objects", file=sys.stderr)
+        sys.exit(1)
 
-
-def validate_json(rows):
-    if not isinstance(rows, list):
-        raise ValueError("json_data must be a JSON array (list of objects).")
-    for i, r in enumerate(rows):
-        if not isinstance(r, dict):
-            raise ValueError(f"Each element must be an object (dict). Found {type(r)} at index {i}.")
-
-
-def build_row(item: dict) -> dict:
-    # Initialize row with blanks
-    row = {h: "" for h in REQUIRED_HEADERS}
-
-    extras = {}
-    for k, v in item.items():
-        nk = normalize_key(str(k))
-        header = NORMALIZED_TO_HEADER.get(nk)
-        if header is not None:
-            if row[header] in ("", None):
-                row[header] = to_cell_value(v)
-            else:
-                # If duplicate mapping, append as JSON to Remarks to avoid loss
-                extras[k] = v
-        else:
-            extras[k] = v
-
-    if extras:
-        extras_json = json.dumps(extras, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        if row["Remarks"]:
-            row["Remarks"] = f"{row['Remarks']} | Extras={extras_json}"
-        else:
-            row["Remarks"] = f"Extras={extras_json}"
-
-    return row
-
-
-def write_excel(rows: list, output_dir: str) -> str:
-    os.makedirs(output_dir, exist_ok=True)
+    for i, row in enumerate(data):
+        if not isinstance(row, dict):
+            print(f"ERROR: element at index {i} is not an object", file=sys.stderr)
+            sys.exit(1)
 
     wb = Workbook()
     ws = wb.active
     ws.title = "TestPlan"
 
-    # Write header
-    ws.append(REQUIRED_HEADERS)
-    for cell in ws[1]:
-        cell.font = Font(bold=True)
-
-    # Freeze first row
+    # Header
+    for col_idx, h in enumerate(HEADERS, start=1):
+        c = ws.cell(row=1, column=col_idx, value=h)
+        c.font = Font(bold=True)
     ws.freeze_panes = "A2"
 
-    # Write data rows
-    for item in rows:
-        row = build_row(item)
-        ws.append([row[h] for h in REQUIRED_HEADERS])
+    # Rows
+    for r_idx, obj in enumerate(data, start=2):
+        for c_idx, key in enumerate(HEADERS, start=1):
+            val = obj.get(key, "")
+            if isinstance(val, (dict, list)):
+                try:
+                    val = json.dumps(val, ensure_ascii=False)
+                except Exception:
+                    val = str(val)
+            ws.cell(row=r_idx, column=c_idx, value=val)
 
-    ts = now_ist_timestamp()
+    # RawJSON sheet to preserve exact input
+    raw_ws = wb.create_sheet("RawJSON")
+    raw_ws.cell(row=1, column=1, value="Exact input JSON (chunked to avoid Excel cell limits):").font = Font(bold=True)
+    CHUNK = 30000
+    chunks = [raw[i:i + CHUNK] for i in range(0, len(raw), CHUNK)] or [""]
+    for i, chunk in enumerate(chunks, start=2):
+        cell = raw_ws.cell(row=i, column=1, value=chunk)
+        cell.alignment = Alignment(wrap_text=True)
+
+    # Save with IST timestamp
+    ts = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y%m%d_%H%M%S")
     filename = f"testplan_{ts}.xlsx"
+    os.makedirs(output_dir, exist_ok=True)
     out_path = os.path.join(output_dir, filename)
     wb.save(out_path)
-    return out_path
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Generate TestPlan Excel from JSON using openpyxl.")
-    parser.add_argument("--input", required=True, help="Path to input JSON file (array of objects)")
-    parser.add_argument("--output-dir", default="Test_Output/GPIO", help="Directory to place the generated Excel")
-    args = parser.parse_args()
-
-    # Read and validate JSON
-    try:
-        with open(args.input, "r", encoding="utf-8") as f:
-            data_raw = f.read()
-        data = json.loads(data_raw)
-    except Exception as e:
-        print(f"ERROR: Failed to read/parse JSON: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    try:
-        validate_json(data)
-    except Exception as e:
-        print(f"ERROR: Invalid JSON structure: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    try:
-        out_path = write_excel(data, args.output_dir)
-    except Exception as e:
-        print(f"ERROR: Failed to write Excel: {e}", file=sys.stderr)
-        sys.exit(1)
-
     print(out_path)
-
 
 if __name__ == "__main__":
     main()

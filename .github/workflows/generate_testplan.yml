@@ -1,0 +1,49 @@
+name: Generate TestPlan Excel
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'input/TestPlan.json'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install openpyxl
+
+      - name: Generate Excel
+        run: |
+          python scripts/generate_testplan_excel.py
+
+      - name: Commit Excel
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Add only generated Excel files
+          if compgen -G "Test_Output/GPIO/*.xlsx" > /dev/null; then
+            git add Test_Output/GPIO/*.xlsx
+          fi
+          if ! git diff --cached --quiet; then
+            git commit -m "Added generated TestPlan Excel"
+            git push
+          else
+            echo "No changes to commit."
+          fi
