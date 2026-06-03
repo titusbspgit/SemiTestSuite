@@ -17,8 +17,6 @@ static test_desc_t tests[] = {
     {"pcie_sii_rc_reg_wr_rd_test", pcie_sii_rc_reg_wr_rd_test},
 };
 
-unity_stats_t Unity = {0,0,0,0};
-
 int main(int argc, char** argv)
 {
     const char* filter = (argc > 1) ? argv[1] : NULL;
@@ -28,12 +26,6 @@ int main(int argc, char** argv)
         if (filter && !strstr(tests[i].name, filter)) continue;
         printf("[ RUN      ] %s\n", tests[i].name);
         tests[i].fn();
-        /* Tests call PASS/FAIL/IGNORE macros which update counters and return */
-        if (Unity.total == Unity.passed + Unity.failed + Unity.ignored) {
-            if (Unity.passed > 0 && (Unity.passed + Unity.failed + Unity.ignored) == Unity.total) {
-                printf("[       OK ] %s\n", tests[i].name);
-            }
-        }
     }
 
     return UnityEnd();
