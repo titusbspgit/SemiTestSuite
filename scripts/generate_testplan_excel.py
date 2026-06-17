@@ -2,7 +2,7 @@
 import argparse
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 try:
     from zoneinfo import ZoneInfo
 except Exception:
@@ -38,12 +38,13 @@ WRAP_COLUMNS = {
 
 
 def timestamp_ist():
-    # Format: YYYYMMDD_HHMMSS in IST (Asia/Kolkata)
+    # Format: YYYYMMDD_HHMMSS in IST (Asia/Kolkata, UTC+05:30)
     if ZoneInfo is not None:
         now = datetime.now(ZoneInfo("Asia/Kolkata"))
     else:
-        # Fallback: assume local time is IST if zoneinfo missing
-        now = datetime.utcnow()
+        # Guaranteed IST using fixed offset if zoneinfo isn't available
+        ist = timezone(timedelta(hours=5, minutes=30))
+        now = datetime.now(ist)
     return now.strftime("%Y%m%d_%H%M%S")
 
 
