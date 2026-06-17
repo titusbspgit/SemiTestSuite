@@ -1,0 +1,58 @@
+[
+  {
+    "Index": "1",
+    "SS / Module": "PCIE",
+    "Feature": "cfg_wr_rd",
+    "Test Case Name": "pcie_cfg_wr_rd_test",
+    "Test Description": "Validate PCIe configuration space registers for reset defaults and masked write/read behavior.",
+    "Speed": "NA",
+    "Mode": "NA",
+    "Remarks": "Requires test_common.h providing read_reg, write_reg, and finish APIs.",
+    "Test Steps / Procedure": "1. Initialize address, default, read/write mask, and skip arrays. 2. Read each register with nonzero read mask and compare to default value. 3. For patterns 0xAAAAAAAA, 0x55555555, 0xFFFFFFFF, 0x00000000, write to registers with nonzero write mask. 4. Read back each register and compute expected value using write masks and defaults. 5. Compare read data against expected and track mismatches. 6. Call finish(0) if no failures else finish(1).",
+    "Impacted Registers": "VENDOR_DEVICE_ID, STATUS_COMMAND, CLASSCODE, BAR0, INT_PIN",
+    "Validation / Acceptance Criteria": "Pass if def_fail_cnt == 0 and wr_fail_cnt == 0. Fail if any CFG_RST_FAIL or CFG_WR_FAIL is printed. Final decision: if(def_fail_cnt > 0 || wr_fail_cnt > 0) finish(1); else finish(0).",
+    "Gap Analysis": "Default values and addresses are hardcoded; no parameterization. No error handling for read_reg/write_reg failures. skip_array not honored in default check path."
+  },
+  {
+    "Index": "2",
+    "SS / Module": "PCIE",
+    "Feature": "dbi_dsp_reg_wr_rd",
+    "Test Case Name": "pcie_dbi_dsp_reg_wr_rd_test",
+    "Test Description": "Verify DSP-side DBI registers for reset defaults and write/read data integrity.",
+    "Speed": "NA",
+    "Mode": "NA",
+    "Remarks": "Requires test_common.h providing read_reg, write_reg, and finish APIs.",
+    "Test Steps / Procedure": "1. Initialize arrays for addresses and default values. 2. Read each register and compare to default value. 3. For patterns 0xAAAAAAAA, 0x55555555, 0x00000000, write all registers. 4. Read back each register and compare to the written pattern. 5. Record failures on mismatch. 6. Call finish(0) if no failures else finish(1).",
+    "Impacted Registers": "CMD_STATUS, CFG_SETUP, OB_SIZE, IRQ_EOI",
+    "Validation / Acceptance Criteria": "Pass if def_fail_cnt == 0 and wr_fail_cnt == 0. Fail if any DSP_RST_FAIL or DSP_WR_FAIL is printed. Final decision: if(def_fail_cnt>0 || wr_fail_cnt>0) finish(1); else finish(0).",
+    "Gap Analysis": "All write_mask/read_mask assumed 0xFFFFFFFF; partial-bit behaviors not validated. No error handling for access failures. Limited data patterns reduce stress coverage."
+  },
+  {
+    "Index": "3",
+    "SS / Module": "PCIE",
+    "Feature": "dbi_usp_reg_wr_rd",
+    "Test Case Name": "pcie_dbi_usp_reg_wr_rd_test",
+    "Test Description": "Check USP-side DBI GPR registers for reset defaults and basic write/read.",
+    "Speed": "NA",
+    "Mode": "NA",
+    "Remarks": "Requires test_common.h providing read_reg, write_reg, and finish APIs.",
+    "Test Steps / Procedure": "1. Initialize address and default value arrays. 2. Read each register and compare to default value. 3. Write pattern 0xA5A5A5A5 to all registers. 4. Read back each register and compare to the written value. 5. Count mismatches. 6. Call finish(0) if no failures else finish(1).",
+    "Impacted Registers": "GPR0, GPR1, GPR2",
+    "Validation / Acceptance Criteria": "Pass if def_fail_cnt == 0 and wr_fail_cnt == 0. Final decision: if(def_fail_cnt || wr_fail_cnt) finish(1); else finish(0).",
+    "Gap Analysis": "Single data pattern; limited coverage. No logging on mismatches; reduced diagnosability. No masking of read-only fields; assumes fully writable registers."
+  },
+  {
+    "Index": "4",
+    "SS / Module": "PCIE",
+    "Feature": "sii_rc_reg_wr_rd",
+    "Test Case Name": "pcie_sii_rc_reg_wr_rd_test",
+    "Test Description": "Validate SII RC inbound register block for defaults and read/write operation.",
+    "Speed": "NA",
+    "Mode": "NA",
+    "Remarks": "Requires test_common.h providing read_reg, write_reg, and finish APIs.",
+    "Test Steps / Procedure": "1. Initialize address and default arrays. 2. Read each register and compare to default value. 3. Write patterns 0xFFFFFFFF and 0x00000000 to all registers. 4. Read back each register after each write. 5. Compare read values to written patterns and track failures. 6. Call finish(0) if no failures else finish(1).",
+    "Impacted Registers": "IB_BAR0, IB_START_LO, IB_OFFSET",
+    "Validation / Acceptance Criteria": "Pass if def_fail_cnt == 0 and wr_fail_cnt == 0. Final decision: if(def_fail_cnt || wr_fail_cnt) finish(1); else finish(0).",
+    "Gap Analysis": "Only two data patterns used; limited coverage. No masking for partial write/read fields. No explicit error reporting on mismatches beyond counters."
+  }
+]
