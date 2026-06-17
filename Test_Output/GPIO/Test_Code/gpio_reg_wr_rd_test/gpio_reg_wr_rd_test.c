@@ -81,10 +81,10 @@ void gpio_reg_wr_rd_test(void)
     {
         uint32_t addr = gp0_gpio_pin_addr(pin);
         // Example default/masks (placeholders)
-        uint32_t read_mask = 0xFFFFFFFF;   // TODO: Replace per-register mask
-        uint32_t def_val   = 0x00000000;   // TODO: Replace with documented default
+        uint32_t read_mask = 0xFFFFFFFFu;   // TODO: Replace per-register mask
+        uint32_t def_val   = 0x00000000u;   // TODO: Replace with documented default
 
-        if (read_mask == 0x0) continue;    // Skip if no readable bits
+        if (read_mask == 0x0u) continue;    // Skip if no readable bits
 
         uint32_t data_rd = read_reg(addr);
         uint32_t data = (data_rd & 0xFFFFFFFEu); // Clear LSB as per test plan
@@ -120,9 +120,9 @@ void gpio_reg_wr_rd_test(void)
         for (unsigned i = 0; i < sizeof(regs)/sizeof(regs[0]); ++i)
         {
             uint32_t addr = regs[i];
-            uint32_t read_mask = 0xFFFFFFFF; // TODO: Replace
-            uint32_t def_val   = 0x00000000; // TODO: Replace per register
-            if (read_mask == 0) continue;
+            uint32_t read_mask = 0xFFFFFFFFu; // TODO: Replace
+            uint32_t def_val   = 0x00000000u; // TODO: Replace per register
+            if (read_mask == 0u) continue;
             uint32_t data = (read_reg(addr) & 0xFFFFFFFEu);
             if (data != def_val)
             {
@@ -144,7 +144,7 @@ void gpio_reg_wr_rd_test(void)
         {
             uint32_t addr = gp0_gpio_pin_addr(pin);
             uint32_t write_mask = 0x00000000u; // TODO: Replace per register write mask
-            if (write_mask == 0x0) continue;
+            if (write_mask == 0x0u) continue;
             write_reg(addr, (data_wr & write_mask));
         }
 
@@ -155,7 +155,7 @@ void gpio_reg_wr_rd_test(void)
             uint32_t write_mask = 0x00000000u; // TODO
             uint32_t read_mask  = 0x00000000u; // TODO
             uint32_t def_val    = 0x00000000u; // TODO
-            if (write_mask == 0x0 || read_mask == 0x0) continue;
+            if (write_mask == 0x0u || read_mask == 0x0u) continue;
             uint32_t data_rd = (read_reg(addr) & read_mask);
             uint32_t wr_n = (write_mask ^ 0xFFFFFFFFu);
             uint32_t exp_val = ((data_wr & read_mask & write_mask) | (wr_n & read_mask & def_val));
