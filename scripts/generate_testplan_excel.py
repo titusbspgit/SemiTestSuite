@@ -2,19 +2,15 @@
 import argparse
 import json
 import os
-from datetime import datetime, timezone, timedelta
-try:
-    from zoneinfo import ZoneInfo
-except Exception:
-    ZoneInfo = None
+from datetime import datetime, timedelta, timezone
+from typing import List, Dict
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 
-HEADERS = [
+REQUIRED_COLUMNS = [
     "Index",
     "SS / Module",
     "Feature",
@@ -37,142 +33,148 @@ WRAP_COLUMNS = {
 }
 
 
-def timestamp_ist():
-    # Format: YYYYMMDD_HHMMSS in IST (Asia/Kolkata, UTC+05:30)
-    if ZoneInfo is not None:
-        now = datetime.now(ZoneInfo("Asia/Kolkata"))
-    else:
-        # Guaranteed IST using fixed offset if zoneinfo isn't available
-        ist = timezone(timedelta(hours=5, minutes=30))
-        now = datetime.now(ist)
-    return now.strftime("%Y%m%d_%H%M%S")
+def ist_timestamp() -> str:
+    # IST is UTC+05:30; avoid dependency on zoneinfo for portability
+    ist = timezone(timedelta(hours=5, minutes=30))
+    now_ist = datetime.now(ist)
+    return now_ist.strftime("%Y%m%d_%H%M%S")
 
 
-def validate_json(data):
+def validate_json(data) -> List[Dict]:
     if not isinstance(data, list):
-        raise ValueError("json_data must be a list of objects")
-    for i, row in enumerate(data, 1):
-        if not isinstance(row, dict):
+        raise ValueError("json_data must be a JSON array")
+    for i, item in enumerate(data, 1):
+        if not isinstance(item, dict):
             raise ValueError(f"Element at index {i} is not an object")
+    return data
 
 
-def auto_fit_columns(ws, max_row, max_col):
-    # Estimate column widths based on content length
-    max_lengths = [0] * (max_col + 1)
-    for col in range(1, max_col + 1):
-        header = ws.cell(row=1, column=col).value
-        max_lengths[col] = len(str(header)) if header is not None else 0
-        for row in range(2, max_row + 1):
-            val = ws.cell(row=row, column=col).value
+def ensure_dir(path: str):
+    os.makedirs(path, exist_ok=True)
+
+
+def compute_column_widths(ws, header_to_index):
+    # Approximate autofit by max string length per column, capped
+    max_len = {h: len(h) for h in header_to_index.keys()}
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, values_only=True):
+        for h, idx in header_to_index.items():
+            val = row[idx - 1]
             if val is None:
                 continue
             length = len(str(val))
-            if length > max_lengths[col]:
-                max_lengths[col] = length
-    for col in range(1, max_col + 1):
-        col_letter = get_column_letter(col)
-        header = ws.cell(row=1, column=col).value
-        # Heuristic width: char count + padding, with caps
-        base_width = max_lengths[col] + 2
-        if header in WRAP_COLUMNS:
-            width = min(max(base_width, 40), 80)
+            if length > max_len[h]:
+                max_len[h] = length
+    for h, idx in header_to_index.items():
+        # Wider default for wrapped columns
+        if h in WRAP_COLUMNS:
+            width = min(max(max_len[h] * 0.9, 40), 100)
         else:
-            width = min(max(base_width, 12), 50)
-        ws.column_dimensions[col_letter].width = width
+            width = min(max(max_len[h] * 0.9, 12), 60)
+        ws.column_dimensions[chr(64 + idx)].width = width
 
 
-def apply_borders(ws, max_row, max_col):
-    thin = Side(border_style="thin", color="000000")
+def apply_borders(ws):
+    thin = Side(style="thin", color="000000")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    for r in range(1, max_row + 1):
-        for c in range(1, max_col + 1):
-            ws.cell(row=r, column=c).border = border
-
-
-def apply_wrap_alignment(ws, max_row, header_to_col):
-    wrap_alignment = Alignment(wrap_text=True, vertical="top")
-    for header in WRAP_COLUMNS:
-        col = header_to_col.get(header)
-        if not col:
-            continue
-        for r in range(2, max_row + 1):
-            ws.cell(row=r, column=col).alignment = wrap_alignment
-
-
-def add_dropdown_validation(ws, last_col_letter, start_row=2):
-    # Allow: Required, Not Required, and blanks across entire column
-    dv = DataValidation(type="list", formula1='"Required,Not Required"', allow_blank=True, showErrorMessage=True)
-    # Apply to all possible rows in the sheet for that column (Excel max rows)
-    dv.ranges.add(f"{last_col_letter}{start_row}:{last_col_letter}1048576")
-    ws.add_data_validation(dv)
-
-
-def build_workbook(rows):
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "TestPlan"
-
-    # Write headers
-    for col, header in enumerate(HEADERS, start=1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = Font(bold=True)
-        cell.alignment = Alignment(vertical="center")
-
-    # Map header to column index
-    header_to_col = {h: i + 1 for i, h in enumerate(HEADERS)}
-
-    # Populate rows; preserve values exactly; missing fields become empty cells
-    for r_idx, obj in enumerate(rows, start=2):
-        for h in HEADERS[:-1]:  # all except the last new column
-            c_idx = header_to_col[h]
-            val = obj.get(h, "")
-            ws.cell(row=r_idx, column=c_idx, value=val)
-        # Last column left empty by default
-
-    max_row = ws.max_row
-    max_col = len(HEADERS)
-
-    # Freeze first row
-    ws.freeze_panes = "A2"
-
-    # Apply wrap to selected columns
-    apply_wrap_alignment(ws, max_row, header_to_col)
-
-    # Apply borders to all cells in the used range
-    apply_borders(ws, max_row, max_col)
-
-    # Data validation dropdown for last column
-    last_col_letter = get_column_letter(max_col)
-    add_dropdown_validation(ws, last_col_letter, start_row=2)
-
-    # Autofit columns
-    auto_fit_columns(ws, max_row, max_col)
-
-    return wb
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+        for cell in row:
+            cell.border = border
 
 
 def main():
     parser = argparse.ArgumentParser(description="Generate TestPlan Excel from JSON")
-    parser.add_argument('--input', required=True, help='Path to source JSON file (array of objects)')
-    parser.add_argument('--output-dir', required=True, help='Directory to write the Excel file into')
+    parser.add_argument("--input", required=True, help="Path to input JSON file (array of objects)")
+    parser.add_argument("--output-dir", required=True, help="Directory to write Excel file into")
     args = parser.parse_args()
 
-    with open(args.input, 'r', encoding='utf-8') as f:
+    with open(args.input, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    validate_json(data)
+    rows = validate_json(data)
 
-    wb = build_workbook(data)
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "TestPlan"
 
-    os.makedirs(args.output_dir, exist_ok=True)
+    # Freeze header row
+    ws.freeze_panes = "A2"
 
-    ts = timestamp_ist()
+    # Write header
+    for col_idx, header in enumerate(REQUIRED_COLUMNS, start=1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = Font(bold=True)
+
+    # Map JSON to required columns
+    for r_idx, item in enumerate(rows, start=2):
+        for c_idx, header in enumerate(REQUIRED_COLUMNS, start=1):
+            if header == "Code Generation (Required / Not)":
+                value = ""
+            else:
+                value = item.get(header, "")
+            cell = ws.cell(row=r_idx, column=c_idx, value=value)
+            # Wrap selected columns
+            if header in WRAP_COLUMNS:
+                cell.alignment = Alignment(wrap_text=True, vertical="top")
+            else:
+                cell.alignment = Alignment(vertical="top")
+
+    # Data Validation for last column
+    last_col_idx = REQUIRED_COLUMNS.index("Code Generation (Required / Not)") + 1
+    dv = DataValidation(type="list", formula1='"Required,Not Required"', allow_blank=True, showDropDown=True)
+    dv.error = "Select a value from the list"
+    dv.errorTitle = "Invalid Input"
+    dv.prompt = "Choose 'Required' or 'Not Required' (or leave blank)"
+    dv.promptTitle = "Code Generation"
+    start_row = 2
+    end_row = ws.max_row if ws.max_row >= 2 else 2
+    dv_range = f"{chr(64 + last_col_idx)}{start_row}:{chr(64 + last_col_idx)}{end_row}"
+    dv.add(dv_range)
+    ws.add_data_validation(dv)
+
+    # Apply borders
+    apply_borders(ws)
+
+    # Approximate autofit
+    header_to_index = {h: i + 1 for i, h in enumerate(REQUIRED_COLUMNS)}
+    compute_column_widths(ws, header_to_index)
+
+    # Add RawData sheet to preserve all JSON fields exactly
+    raw = wb.create_sheet("RawData")
+    # Determine key order by first appearance across rows
+    keys_order = []
+    seen = set()
+    for obj in rows:
+        for k in obj.keys():
+            if k not in seen:
+                seen.add(k)
+                keys_order.append(k)
+    # Header
+    for i, k in enumerate(keys_order, start=1):
+        cell = raw.cell(row=1, column=i, value=k)
+        cell.font = Font(bold=True)
+    # Rows
+    for r, obj in enumerate(rows, start=2):
+        for i, k in enumerate(keys_order, start=1):
+            cell = raw.cell(row=r, column=i, value=obj.get(k, ""))
+            cell.alignment = Alignment(vertical="top")
+    apply_borders(raw)
+    # Basic widths for raw
+    for i in range(1, raw.max_column + 1):
+        raw.column_dimensions[chr(64 + i)].width = 24
+
+    ensure_dir(args.output_dir)
+    ts = ist_timestamp()
     filename = f"testplan_{ts}.xlsx"
     out_path = os.path.join(args.output_dir, filename)
     wb.save(out_path)
 
-    print(f"Generated: {out_path}")
+    print(out_path)
+    # Expose path to later workflow steps if running in GitHub Actions
+    gha = os.environ.get("GITHUB_OUTPUT")
+    if gha:
+        with open(gha, "a", encoding="utf-8") as g:
+            g.write(f"excel_path={out_path}\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
