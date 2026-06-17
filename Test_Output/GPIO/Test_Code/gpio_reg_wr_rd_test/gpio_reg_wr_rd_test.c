@@ -134,7 +134,7 @@ void gpio_reg_wr_rd_test(void)
     }
 
     // Step 2: Masked write-read verification across six patterns
-    const uint32_t chk_val[6] = { 0xFFFFFFFFu, 0xAAAAAAA Au, 0x55555555u, 0xF5F5F5F5u, 0xA5A5A5A5u, 0xFFFF0000u };
+    const uint32_t chk_val[6] = { 0xFFFFFFFFu, 0xAAAAAAAAu, 0x55555555u, 0xF5F5F5F5u, 0xA5A5A5A5u, 0xFFFF0000u };
     for (unsigned p = 0; p < 6; ++p)
     {
         uint32_t data_wr = chk_val[p];
