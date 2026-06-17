@@ -1,11 +1,13 @@
-name: Generate and Commit TestPlan Excel (PCIE)
+name: Generate TestPlan Excel
 
 on:
-  workflow_dispatch:
   push:
+    branches: [ main ]
     paths:
-      - 'scripts/generate_testplan_excel.py'
-      - 'Test_Output/PCIE/testplan_source.json'
+      - '.github/workflows/generate_testplan_excel.yml'
+      - 'tools/testplan_to_excel.py'
+      - 'Test_Output/PCIE/testplan.json'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,32 +19,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: main
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.x'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install openpyxl tzdata
+          pip install openpyxl
 
-      - name: Generate TestPlan Excel
+      - name: Generate Excel from JSON
+        env:
+          JSON_PATH: Test_Output/PCIE/testplan.json
+          OUTPUT_DIR: Test_Output/PCIE
         run: |
-          python scripts/generate_testplan_excel.py \
-            --input "Test_Output/PCIE/testplan_source.json" \
-            --output-dir "Test_Output/PCIE"
+          python tools/testplan_to_excel.py
 
       - name: Commit generated Excel
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Test_Output/PCIE/
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
+          if ls Test_Output/PCIE/*.xlsx >/dev/null 2>&1; then
+            git add Test_Output/PCIE/*.xlsx
+            if [ -n "$(git status --porcelain)" ]; then
+              git commit -m "Added generated TestPlan Excel"
+              git push
+            else
+              echo "No changes to commit."
+            fi
           else
-            git commit -m "Added generated TestPlan Excel"
-            git push
+            echo "No Excel files found to commit."
           fi
