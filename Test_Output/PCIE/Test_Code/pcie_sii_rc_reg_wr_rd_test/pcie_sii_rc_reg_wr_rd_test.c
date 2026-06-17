@@ -1,92 +1,93 @@
 #include "pcie_sii_rc_reg_wr_rd_test.h"
 #include <stdint.h>
 #include <stdio.h>
+#include "test_common.h"  // Provides read_reg, write_reg, finish
 
-/* Register Definitions */
-/* RAG data used: SII RC inbound window 0 offsets relative to SII_RC_CFG_BASE. */
-#define SII_RC_CFG_BASE               0x0  /* TODO: Replace with actual SII RC config base */
-
-#define IB_BAR0_OFFSET                0x300
-#define IB_START0_LO_OFFSET           0x304
-#define IB_OFFSET0_OFFSET             0x30C
-
-#define BASE_ADDR_IB_BAR0             (SII_RC_CFG_BASE + IB_BAR0_OFFSET)
-#define BASE_ADDR_IB_START_LO         (SII_RC_CFG_BASE + IB_START0_LO_OFFSET)
-#define BASE_ADDR_IB_OFFSET           (SII_RC_CFG_BASE + IB_OFFSET0_OFFSET)
-
-/* Low-level access */
-static inline void write_reg(uint32_t addr, uint32_t val)
+/* Low-level access fallbacks (not used if test_common.h provides APIs). */
+static inline void ag_write_reg(uint32_t addr, uint32_t val)
 {
-    *(volatile uint32_t *)addr = val;
+    *(volatile uint32_t *)addr = val;  /* exact line required */
+}
+static inline uint32_t ag_read_reg(uint32_t addr)
+{
+    return *(volatile uint32_t *)addr;  /* exact line required */
 }
 
-static inline uint32_t read_reg(uint32_t addr)
+/* Register Definitions (RAG-enriched typical PCIeSS inbound window 0) */
+#define PCIE_IB_BASE       0x00000000  // TODO: Replace with Application/Inb. Region base
+
+#define IB_BAR0_OFFSET     0x00000000  // R/W, bits [3:0] valid
+#define IB_START_LO_OFFSET 0x00000008  // R/W, [31:20] used (1 MB aligned)
+#define IB_OFFSET_OFFSET   0x00000010  // R/W, [31:20] used (1 MB aligned)
+
+#define DEFAULT_IB_BAR0        0x00000000
+#define DEFAULT_IB_START_LO    0x00000000
+#define DEFAULT_IB_OFFSET      0x00000000
+
+#define IB_BAR0_RW_MASK        0x0000000Fu
+#define IB_START_LO_RW_MASK    0xFFF00000u
+#define IB_OFFSET_RW_MASK      0xFFF00000u
+
+static inline uint32_t ib_addr(uint32_t offset)
 {
-    return *(volatile uint32_t *)addr;
+    return (PCIE_IB_BASE + offset);
 }
 
-static inline void finish(int code)
-{
-    printf("finish(%d)\n", code);
-}
-
-/* Test Function */
 void pcie_sii_rc_reg_wr_rd_test(void)
 {
-    uint32_t val;
-    unsigned i, p;
-    unsigned def_fail_cnt = 0, wr_fail_cnt = 0;
-
     printf("Running %s\n", "pcie_sii_rc_reg_wr_rd_test");
 
-    static const uint32_t addr_array[] = {
-        BASE_ADDR_IB_BAR0,
-        BASE_ADDR_IB_START_LO,
-        BASE_ADDR_IB_OFFSET
-    };
+    const char *names[] = { "IB_BAR0", "IB_START_LO", "IB_OFFSET" };
+    const uint32_t offsets[] = { IB_BAR0_OFFSET, IB_START_LO_OFFSET, IB_OFFSET_OFFSET };
+    const uint32_t def_vals[] = { DEFAULT_IB_BAR0, DEFAULT_IB_START_LO, DEFAULT_IB_OFFSET };
+    const uint32_t masks[] = { IB_BAR0_RW_MASK, IB_START_LO_RW_MASK, IB_OFFSET_RW_MASK };
 
-    /* Reset defaults are 0 per RAG for inbound window registers */
-    static const uint32_t default_value_array[] = {
-        0x00000000, 0x00000000, 0x00000000
-    };
+    uint32_t def_fail_cnt = 0;
+    uint32_t wr_fail_cnt  = 0;
 
-    static const uint32_t patterns[] = { 0xFFFFFFFFu, 0x00000000u };
-
-    /* Step 1: Default check */
-    for (i = 0; i < (sizeof(addr_array)/sizeof(addr_array[0])); ++i)
+    /* Step 1/2: Default read and compare */
+    for (unsigned i = 0; i < 3; ++i)
     {
-        uint32_t exp = default_value_array[i];
-        val = read_reg(addr_array[i]);
-        if (val != exp)
+        uint32_t rv = read_reg(ib_addr(offsets[i])) & masks[i];
+        uint32_t exp = def_vals[i] & masks[i];
+        if (rv != exp)
         {
-            ++def_fail_cnt;
-            printf("SII_RST_FAIL: idx=%u addr=0x%08X exp=0x%08X act=0x%08X\n", i, addr_array[i], exp, val);
+            printf("SII_RST_FAIL: %s exp=0x%08X got=0x%08X mask=0x%08X\n", names[i], exp, rv, masks[i]);
+            def_fail_cnt++;
         }
     }
 
-    /* Step 2-4: Write patterns and verify */
-    for (p = 0; p < (sizeof(patterns)/sizeof(patterns[0])); ++p)
+    /* Step 3/4/5: Write patterns then read back */
+    const uint32_t patterns[] = { 0xFFFFFFFFu, 0x00000000u };
+
+    for (unsigned p = 0; p < (sizeof(patterns)/sizeof(patterns[0])); ++p)
     {
-        for (i = 0; i < (sizeof(addr_array)/sizeof(addr_array[0])); ++i)
+        for (unsigned i = 0; i < 3; ++i)
         {
-            write_reg(addr_array[i], patterns[p]);
-            val = read_reg(addr_array[i]);
-            if (val != patterns[p])
+            uint32_t addr = ib_addr(offsets[i]);
+            uint32_t mask = masks[i];
+            uint32_t wv   = (def_vals[i] & ~mask) | (patterns[p] & mask);
+            write_reg(addr, wv);
+            uint32_t rv = read_reg(addr) & mask;
+            uint32_t exp = wv & mask;
+            if (rv != exp)
             {
-                ++wr_fail_cnt;
-                printf("SII_WR_FAIL: idx=%u pat=0x%08X addr=0x%08X exp=0x%08X act=0x%08X\n", i, patterns[p], addr_array[i], patterns[p], val);
+                printf("SII_WR_FAIL: %s pat=0x%08X exp=0x%08X got=0x%08X mask=0x%08X\n",
+                       names[i], patterns[p], exp, rv, mask);
+                wr_fail_cnt++;
             }
         }
     }
 
-    if (def_fail_cnt == 0 && wr_fail_cnt == 0)
+    if (def_fail_cnt > 0 || wr_fail_cnt > 0)
     {
-        printf("Test Passed\n");
-        finish(0);
-    }
-    else
-    {
+        printf("Failures: def=%u, wr=%u\n", def_fail_cnt, wr_fail_cnt);
         printf("Test Failed\n");
+        while(1);
         finish(1);
+        return;
     }
+
+    printf("Test Passed\n");
+    finish(0);
 }

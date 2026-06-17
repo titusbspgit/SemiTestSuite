@@ -1,151 +1,189 @@
 #include "pcie_cfg_wr_rd_test.h"
 #include <stdint.h>
 #include <stdio.h>
+#include "test_common.h"  // Provides read_reg, write_reg, finish
 
-/* Register Definitions */
-/* RAG data used: Standard PCI/PCIe Configuration Space offsets.
- * Base address is device-specific. Placeholder provided below.
- */
-#define PCIE_CFG_BASE                 0x0  /* TODO: Update with device-specific local config base or ECAM base */
-
-#define VENDOR_DEVICE_ID_OFFSET       0x000
-#define STATUS_COMMAND_OFFSET         0x004
-#define CLASSCODE_OFFSET              0x008
-#define BAR0_OFFSET                   0x010
-#define INT_PIN_OFFSET                0x03C  /* Access 32-bit at 0x03C; INT_PIN is bits [15:8] */
-
-#define BASE_ADDR_VENDOR_DEVICE_ID    (PCIE_CFG_BASE + VENDOR_DEVICE_ID_OFFSET)
-#define BASE_ADDR_STATUS_COMMAND      (PCIE_CFG_BASE + STATUS_COMMAND_OFFSET)
-#define BASE_ADDR_CLASSCODE           (PCIE_CFG_BASE + CLASSCODE_OFFSET)
-#define BASE_ADDR_BAR0                (PCIE_CFG_BASE + BAR0_OFFSET)
-#define BASE_ADDR_INT_PIN             (PCIE_CFG_BASE + INT_PIN_OFFSET)
-
-/* Bitfield helpers from RAG (subset) */
-#define STATUS_COMMAND_COMMAND_MEM_EN    (1u << 1)
-#define STATUS_COMMAND_COMMAND_BUS_MASTER_EN (1u << 2)
-#define INT_PIN_FIELD_MASK               (0xFFu << 8)
-
-/* Low-level access */
-static inline void write_reg(uint32_t addr, uint32_t val)
+/* Low-level access fallbacks (not used if test_common.h provides APIs). */
+static inline void ag_write_reg(uint32_t addr, uint32_t val)
 {
-    *(volatile uint32_t *)addr = val;
+    *(volatile uint32_t *)addr = val;  /* exact line required */
+}
+static inline uint32_t ag_read_reg(uint32_t addr)
+{
+    return *(volatile uint32_t *)addr;  /* exact line required */
 }
 
-static inline uint32_t read_reg(uint32_t addr)
+/* Register Definitions (RAG-enriched; base is device-specific) */
+// CFG_BASE is the base of PCIe Type-0 Configuration Space mapping for the target function
+#define CFG_BASE                 0x00000000  // TODO: Replace with actual config space base
+
+#define VENDOR_DEVICE_ID_OFFSET  0x00000000  // From PCIe Type-0 header
+#define STATUS_COMMAND_OFFSET    0x00000004  // STATUS[31:16] | COMMAND[15:0]
+#define CLASSCODE_OFFSET         0x00000008  // REV_ID[7:0] | PIF[15:8] | SUB_CLASS[23:16] | BASE_CLASS[31:24]
+#define BAR0_OFFSET              0x00000010  // BAR0 (32b or 64b lower)
+#define INT_LINE_PIN_OFFSET      0x0000003C  // INT_LINE @ [7:0], INT_PIN @ [15:8] (PCI), or [31:24] per RAG note
+
+/* Reset defaults (unknown -> placeholders) */
+#define DEFAULT_VENDOR_DEVICE_ID 0x00000000  // TODO: Replace with silicon-specific default
+#define DEFAULT_STATUS_COMMAND   0x00000000
+#define DEFAULT_CLASSCODE        0x00000000  // TODO: Replace with device class/rev
+#define DEFAULT_BAR0             0x00000000
+#define DEFAULT_INT_PIN_WORD     0x00000000  // TODO: INT_PIN byte encoded within this word
+
+/* Masks from RAG */
+#define VENDOR_DEVICE_ID_RD_MASK 0xFFFFFFFFu
+#define VENDOR_DEVICE_ID_WR_MASK 0x00000000u
+
+#define STATUS_COMMAND_RD_MASK   0xFFFFFFFFu
+#define STATUS_COMMAND_WR_MASK   0x00000406u   /* COMMAND bits RW via cfg: BME,MSE,INTxDIS */
+#define STATUS_W1C_MASK          0xBE000000u   /* Device-specific; treat as W1C per RAG note */
+
+#define CLASSCODE_RD_MASK        0xFFFFFFFFu
+#define CLASSCODE_WR_MASK        0x00000000u
+
+#define BAR0_RD_MASK             0xFFFFFFFFu   /* Readback may reflect size probe when writing 0xFFFF_FFFF */
+#define BAR0_WR_MASK             0xFFFFFFF0u   /* Attribute bits fixed; BASE[31:4] RW */
+
+#define INT_PIN_RD_MASK          0x0000FF00u   /* INT_PIN typically at [15:8] for legacy PCI; device-specific */
+#define INT_PIN_WR_MASK          0x00000000u
+
+static inline uint32_t cfg_addr(uint32_t offset)
 {
-    return *(volatile uint32_t *)addr;
+    return (CFG_BASE + offset);
 }
 
-/* Minimal finish() shim to preserve test intent */
-static inline void finish(int code)
-{
-    printf("finish(%d)\n", code);
-}
-
-/* Test Function */
 void pcie_cfg_wr_rd_test(void)
 {
-    uint32_t val;
-    unsigned i, p;
-    unsigned def_fail_cnt = 0, wr_fail_cnt = 0;
-
     printf("Running %s\n", "pcie_cfg_wr_rd_test");
 
-    /* Address list derived from Excel Impacted Registers */
-    static const uint32_t addr_array[] = {
-        BASE_ADDR_VENDOR_DEVICE_ID,
-        BASE_ADDR_STATUS_COMMAND,
-        BASE_ADDR_CLASSCODE,
-        BASE_ADDR_BAR0,
-        BASE_ADDR_INT_PIN
+    /* Step 1: Initialize arrays based on Excel steps */
+    const char *names[] = {
+        "VENDOR_DEVICE_ID",
+        "STATUS_COMMAND",
+        "CLASSCODE",
+        "BAR0",
+        "INT_PIN"
+    };
+    const uint32_t offsets[] = {
+        VENDOR_DEVICE_ID_OFFSET,
+        STATUS_COMMAND_OFFSET,
+        CLASSCODE_OFFSET,
+        BAR0_OFFSET,
+        INT_LINE_PIN_OFFSET
+    };
+    const uint32_t def_vals[] = {
+        DEFAULT_VENDOR_DEVICE_ID,
+        DEFAULT_STATUS_COMMAND,
+        DEFAULT_CLASSCODE,
+        DEFAULT_BAR0,
+        DEFAULT_INT_PIN_WORD
+    };
+    const uint32_t rd_masks[] = {
+      VENDOR_DEVICE_ID_RD_MASK,
+      STATUS_COMMAND_RD_MASK,
+      CLASSCODE_RD_MASK,
+      BAR0_RD_MASK,
+      INT_PIN_RD_MASK
+    };
+    const uint32_t wr_masks[] = {
+      VENDOR_DEVICE_ID_WR_MASK,
+      STATUS_COMMAND_WR_MASK,
+      CLASSCODE_WR_MASK,
+      BAR0_WR_MASK,
+      INT_PIN_WR_MASK
     };
 
-    /* Default reset values (Excel note: hardcoded to 0).
-     * TODO: Replace with true reset defaults from device manual if available.
-     */
-    static const uint32_t default_value_array[] = {
-        0x00000000, /* VENDOR_DEVICE_ID (device-specific; RAG indicates not 0) */
-        0x00000000, /* STATUS_COMMAND: commonly COMMAND=0x0000; STATUS device-specific */
-        0x00000000, /* CLASSCODE (device-specific) */
-        0x00000000, /* BAR0 */
-        0x00000000  /* INT/Latency dword */
-    };
+    uint32_t def_fail_cnt = 0;
+    uint32_t wr_fail_cnt  = 0;
 
-    /* Read and write masks (Excel: uses read_mask_array/write_mask_array/skip_array).
-     * Values below are safe defaults; update as per HW RO/RW behavior.
-     * - VENDOR_DEVICE_ID: RO -> write mask 0
-     * - STATUS_COMMAND: write COMMAND[15:0] only
-     * - CLASSCODE: RO -> write mask 0
-     * - BAR0: RW by RC during enumeration -> full mask
-     * - INT_PIN: target INT_PIN in [15:8]
-     */
-    static const uint32_t read_mask_array[] = {
-        0xFFFFFFFFu, /* VENDOR_DEVICE_ID */
-        0xFFFFFFFFu, /* STATUS_COMMAND */
-        0xFFFFFFFFu, /* CLASSCODE */
-        0xFFFFFFFFu, /* BAR0 */
-        0xFFFFFFFFu  /* INT/Latency dword */
-    };
-
-    static const uint32_t write_mask_array[] = {
-        0x00000000u, /* VENDOR_DEVICE_ID */
-        0x0000FFFFu, /* STATUS_COMMAND: COMMAND field */
-        0x00000000u, /* CLASSCODE */
-        0xFFFFFFFFu, /* BAR0 */
-        0x0000FF00u  /* INT_PIN field within 0x03C */
-    };
-
-    /* Patterns per Excel */
-    static const uint32_t patterns[] = {
-        0xAAAAAAAAu, 0x55555555u, 0xFFFFFFFFu, 0x00000000u
-    };
-
-    /* Step 1: Read each address and compare to default_value_array using read_mask_array */
-    for (i = 0; i < (sizeof(addr_array)/sizeof(addr_array[0])); ++i)
+    /* Step 2: Default read and compare against defaults using read masks */
+    for (unsigned i = 0; i < (sizeof(offsets)/sizeof(offsets[0])); ++i)
     {
-        uint32_t exp = default_value_array[i] & read_mask_array[i];
-        val = read_reg(addr_array[i]) & read_mask_array[i];
-        if (val != exp)
+        if (rd_masks[i] == 0)
+            continue; /* Skip if no readable bits */
+
+        uint32_t val = read_reg(cfg_addr(offsets[i]));
+        uint32_t exp = def_vals[i];
+        if ((val & rd_masks[i]) != (exp & rd_masks[i]))
         {
-            ++def_fail_cnt;
-            printf("CFG_RST_FAIL: idx=%u addr=0x%08X exp=0x%08X act=0x%08X\n", i, addr_array[i], exp, val);
+            printf("CFG_RST_FAIL: %s exp=0x%08X got=0x%08X mask=0x%08X\n",
+                   names[i], (exp & rd_masks[i]), (val & rd_masks[i]), rd_masks[i]);
+            def_fail_cnt++;
         }
     }
 
-    /* Step 2-3: Write patterns to writable addresses per write_mask_array and verify */
-    for (p = 0; p < (sizeof(patterns)/sizeof(patterns[0])); ++p)
+    /* Step 3/4: Write patterns using write masks and compute expected */
+    const uint32_t patterns[] = { 0xAAAAAAAAu, 0x55555555u, 0xFFFFFFFFu, 0x00000000u };
+
+    for (unsigned p = 0; p < (sizeof(patterns)/sizeof(patterns[0])); ++p)
     {
-        uint32_t data_wr = patterns[p];
-        for (i = 0; i < (sizeof(addr_array)/sizeof(addr_array[0])); ++i)
+        for (unsigned i = 0; i < (sizeof(offsets)/sizeof(offsets[0])); ++i)
         {
-            uint32_t wmask = write_mask_array[i];
-            if (wmask == 0u)
+            uint32_t wmask = wr_masks[i];
+            if (wmask == 0)
+                continue; /* RO register, skip write/readback */
+
+            uint32_t addr = cfg_addr(offsets[i]);
+            uint32_t defv = def_vals[i];
+            uint32_t pat  = patterns[p];
+
+            /* Program value with mask applied */
+            uint32_t writev = (defv & ~wmask) | (pat & wmask);
+            write_reg(addr, writev);
+
+            /* Read back and validate only the writable bits */
+            uint32_t rval = read_reg(addr);
+            uint32_t exp  = writev;
+
+            /* Special handling: STATUS_COMMAND has W1C status bits in upper half; ensure they read 0 if written 1 */
+            if (i == 1) /* STATUS_COMMAND index */
             {
-                continue; /* skip RO/registers */
+                /* Any 1 written to W1C bits clears them -> expected 0 for those bits */
+                uint32_t w1c_ones = (pat & STATUS_W1C_MASK);
+                (void)w1c_ones; /* informational; exp already excludes STATUS W1C bits due to WR mask only covering COMMAND */
+                /* We restrict comparison to COMMAND write mask only */
+                rval &= STATUS_COMMAND_WR_MASK;
+                exp  &= STATUS_COMMAND_WR_MASK;
             }
-            uint32_t computed = (data_wr & wmask) | ((~wmask) & default_value_array[i]);
-            write_reg(addr_array[i], computed);
-            val = read_reg(addr_array[i]) & read_mask_array[i];
-            /* Expected follows Excel formula */
-            uint32_t expected = (data_wr & wmask) | ((~wmask) & default_value_array[i]);
-            expected &= read_mask_array[i];
-            if (val != expected)
+            else if (i == 3) /* BAR0 size-probe caveat when pat == 0xFFFFFFFF */
             {
-                ++wr_fail_cnt;
-                printf("CFG_WR_FAIL: idx=%u pat=0x%08X addr=0x%08X exp=0x%08X act=0x%08X\n", i, data_wr, addr_array[i], expected, val);
+                if (pat == 0xFFFFFFFFu)
+                {
+                    /* Readback during size probe is implementation-defined; compare only attribute bits */
+                    rval &= ~BAR0_WR_MASK; /* Attributes are RO/fixed */
+                    exp  &= ~BAR0_WR_MASK;
+                }
+                else
+                {
+                    rval &= BAR0_WR_MASK;
+                    exp  &= BAR0_WR_MASK;
+                }
+            }
+            else
+            {
+                rval &= wmask;
+                exp  &= wmask;
+            }
+
+            if (rval != exp)
+            {
+                printf("CFG_WR_FAIL: %s pat=0x%08X exp=0x%08X got=0x%08X mask=0x%08X\n",
+                       names[i], pat, exp, rval, wmask);
+                wr_fail_cnt++;
             }
         }
     }
 
-    /* Step 4-5: Validation and finish */
-    if (def_fail_cnt == 0 && wr_fail_cnt == 0)
+    /* Step 5/6: Final decision */
+    if (def_fail_cnt > 0 || wr_fail_cnt > 0)
     {
-        printf("Test Passed\n");
-        finish(0);
-    }
-    else
-    {
+        printf("Failures: def=%u, wr=%u\n", def_fail_cnt, wr_fail_cnt);
         printf("Test Failed\n");
+        while(1); /* exact sequence required */
         finish(1);
+        return;
     }
+
+    printf("Test Passed\n");
+    finish(0);
 }
