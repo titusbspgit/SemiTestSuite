@@ -1,7 +1,12 @@
-name: Generate and Commit TestPlan Excel
+name: Generate GPIO TestPlan Excel
 
 on:
-  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/generate_testplan_excel.py'
+      - 'Test_Output/GPIO/testplan_input.json'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -10,141 +15,38 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install openpyxl
 
-      - name: Prepare JSON input
+      - name: Generate Excel
         run: |
-          mkdir -p tmp
-          cat > tmp/testplan.json <<'JSON'
-          [
-            {
-              "Index": "1",
-              "IP_NAME": "GPIO",
-              "folder_name": "gpio_reg_wr_rd_test",
-              "github_url": "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/gpio/gpio_reg_wr_rd_test",
-              "raw_base_url": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/gpio_reg_wr_rd_test/",
-              "SS / Module": "GPIO",
-              "Feature": "gpio_reg_wr_rd_test",
-              "Test Case Name": "gpio_reg_wr_rd_test",
-              "Test Description": "Validate GPIO output register write/read by toggling PA0 and checking GPIOA_ODR bit 0.",
-              "Speed": "NA",
-              "Mode": "NA",
-              "Remarks": "Requires ITM/SWO print availability; code halts in an infinite loop after PASS/FAIL.",
-              "Test Steps / Procedure": "1. Enable GPIOA clock via RCC_AHB1ENR.\n2. Configure PA0 as output using GPIOA_MODER.\n3. Set GPIOA_ODR bit 0 and verify it reads back as 1; else fail.\n4. Clear GPIOA_ODR bit 0 and verify it reads back as 0; else fail.\n5. Print pass message and enter infinite loop.",
-              "Impacted Registers": "RCC_AHB1ENR, GPIOA_MODER, GPIOA_ODR",
-              "Validation / Acceptance Criteria": "PASS if after GPIOA_ODR |= (1<<0), (GPIOA_ODR & (1<<0)) != 0 and after GPIOA_ODR &= ~(1<<0), (GPIOA_ODR & (1<<0)) == 0; otherwise prints \"FAIL: GPIO WRITE HIGH\" or \"FAIL: GPIO WRITE LOW\" and halts.",
-              "Gap Analysis": "Only register readback is verified; no electrical validation. No reset/cleanup; infinite loop at end."
-            },
-            {
-              "Index": "2",
-              "IP_NAME": "GPIO",
-              "folder_name": "test_gpio_nedge_alternate_pads_en",
-              "github_url": "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/gpio/test_gpio_nedge_alternate_pads_en",
-              "raw_base_url": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/test_gpio_nedge_alternate_pads_en/",
-              "SS / Module": "GPIO",
-              "Feature": "test_gpio_nedge_alternate_pads_en",
-              "Test Case Name": "test_gpio_nedge_alternate_pads_en",
-              "Test Description": "Enable falling-edge trigger on alternate pads (pins 0,2,4,6) and verify EXTI_FTSR bits are set.",
-              "Speed": "NA",
-              "Mode": "NA",
-              "Remarks": "Requires EXTI access and ITM print; code halts in an infinite loop after PASS/FAIL.",
-              "Test Steps / Procedure": "1. Define pins {0,2,4,6}.\n2. For each pin, set its bit in EXTI_FTSR.\n3. Read back EXTI_FTSR and verify the corresponding bit is set; else fail.\n4. Print pass message and enter infinite loop.",
-              "Impacted Registers": "EXTI_FTSR",
-              "Validation / Acceptance Criteria": "For each pin in {0,2,4,6}, after EXTI_FTSR |= (1<<pin), (EXTI_FTSR & (1<<pin)) must be nonzero; else prints \"FAIL: NEDGE ALT PAD\" and halts.",
-              "Gap Analysis": "No interrupt mask or source mapping verified; only configuration bit set is checked. No actual edge stimulus or pending flag check."
-            },
-            {
-              "Index": "3",
-              "IP_NAME": "GPIO",
-              "folder_name": "test_gpio_negedge_intr_en",
-              "github_url": "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/gpio/test_gpio_negedge_intr_en",
-              "raw_base_url": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/test_gpio_negedge_intr_en/",
-              "SS / Module": "GPIO",
-              "Feature": "test_gpio_negedge_intr_en",
-              "Test Case Name": "test_gpio_negedge_intr_en",
-              "Test Description": "Configure PA1 for EXTI1 falling-edge interrupt enable and verify EXTI_FTSR bit 1 is set.",
-              "Speed": "NA",
-              "Mode": "NA",
-              "Remarks": "Requires RCC/SYSCFG/EXTI access and ITM print; no ISR installed; infinite loop after PASS/FAIL.",
-              "Test Steps / Procedure": "1. Enable AHB1 and APB2 clocks via RCC_AHB1ENR and RCC_APB2ENR.\n2. Configure PA1 as input using GPIOA_MODER.\n3. Map PA1 to EXTI1 via SYSCFG_EXTICR1.\n4. Unmask EXTI1 in EXTI_IMR and enable falling edge in EXTI_FTSR.\n5. Verify EXTI_FTSR bit 1 is set; else fail.\n6. Print pass message and enter infinite loop.",
-              "Impacted Registers": "RCC_AHB1ENR, RCC_APB2ENR, GPIOA_MODER, SYSCFG_EXTICR1, EXTI_IMR, EXTI_FTSR",
-              "Validation / Acceptance Criteria": "After configuration, (EXTI_FTSR & (1<<1)) must be nonzero; otherwise prints \"FAIL: NEG EDGE NOT ENABLED\" and halts.",
-              "Gap Analysis": "Does not verify interrupt firing or pending flag; only configuration. No debounce or error handling/cleanup."
-            },
-            {
-              "Index": "4",
-              "IP_NAME": "GPIO",
-              "folder_name": "test_gpio_pedge_all_pads_en",
-              "github_url": "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/gpio/test_gpio_pedge_all_pads_en",
-              "raw_base_url": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/test_gpio_pedge_all_pads_en/",
-              "SS / Module": "GPIO",
-              "Feature": "test_gpio_pedge_all_pads_en",
-              "Test Case Name": "test_gpio_pedge_all_pads_en",
-              "Test Description": "Enable rising-edge trigger on all pads (pins 0–7) and verify EXTI_RTSR bits are set.",
-              "Speed": "NA",
-              "Mode": "NA",
-              "Remarks": "Requires EXTI access and ITM print; code halts in an infinite loop after PASS/FAIL.",
-              "Test Steps / Procedure": "1. Iterate pins 0 through 7.\n2. For each pin, set its bit in EXTI_RTSR.\n3. Read back EXTI_RTSR and verify the corresponding bit is set; else fail.\n4. Print pass message and enter infinite loop.",
-              "Impacted Registers": "EXTI_RTSR",
-              "Validation / Acceptance Criteria": "For i = 0..7, after EXTI_RTSR |= (1<<i), (EXTI_RTSR & (1<<i)) must be nonzero; else prints \"FAIL: PEDGE ALL PADS\" and halts.",
-              "Gap Analysis": "No IMR masking or pin-to-EXTI mapping; only RTSR configuration. No stimulus generation or ISR validation."
-            },
-            {
-              "Index": "5",
-              "IP_NAME": "GPIO",
-              "folder_name": "test_gpio_pedge_alternate_pads_en",
-              "github_url": "https://github.com/titusbspgit/SemiTestSuite/tree/main/TestRepo/gpio/test_gpio_pedge_alternate_pads_en",
-              "raw_base_url": "https://raw.githubusercontent.com/titusbspgit/SemiTestSuite/main/TestRepo/gpio/test_gpio_pedge_alternate_pads_en/",
-              "SS / Module": "GPIO",
-              "Feature": "test_gpio_pedge_alternate_pads_en",
-              "Test Case Name": "test_gpio_pedge_alternate_pads_en",
-              "Test Description": "Enable rising-edge trigger on alternate pads (pins 0,2,4,6) and verify EXTI_RTSR bits are set.",
-              "Speed": "NA",
-              "Mode": "NA",
-              "Remarks": "Requires EXTI access and ITM print; code halts in an infinite loop after PASS/FAIL.",
-              "Test Steps / Procedure": "1. Define pins {0,2,4,6}.\n2. For each pin, set its bit in EXTI_RTSR.\n3. Read back EXTI_RTSR and verify the corresponding bit is set; else fail.\n4. Print pass message and enter infinite loop.",
-              "Impacted Registers": "EXTI_RTSR",
-              "Validation / Acceptance Criteria": "For each pin in {0,2,4,6}, after EXTI_RTSR |= (1<<pin), (EXTI_RTSR & (1<<pin)) must be nonzero; else prints \"FAIL: PEDGE ALT PAD\" and halts.",
-              "Gap Analysis": "No interrupt mask or mapping; only RTSR bit set verified. No actual edge stimulus or ISR behavior check."
-            }
-          ]
-          JSON
-
-      - name: Generate Excel from JSON
-        run: |
-          python scripts/generate_testplan_excel.py --input tmp/testplan.json --output-dir Test_Output/GPIO
-
-      - name: Capture generated Excel path
-        id: find_excel
-        shell: bash
-        run: |
-          set -e
-          latest=$(ls -t Test_Output/GPIO/testplan_*.xlsx | head -n1)
-          echo "excel=${latest}" >> "$GITHUB_OUTPUT"
-          echo "Found Excel: ${latest}"
+          python scripts/generate_testplan_excel.py \
+            --input "Test_Output/GPIO/testplan_input.json" \
+            --output-dir "Test_Output/GPIO"
 
       - name: Commit and push Excel
-        if: steps.find_excel.outputs.excel != ''
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
         run: |
           set -e
-          excel="${{ steps.find_excel.outputs.excel }}"
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add "$excel"
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-          else
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          FILE=$(ls -1t Test_Output/GPIO/testplan_*.xlsx 2>/dev/null | head -n 1 || true)
+          if [ -n "$FILE" ]; then
+            git add "$FILE"
             git commit -m "Added generated TestPlan Excel"
-            git push origin HEAD:main
+            git push origin HEAD:"$BRANCH_NAME"
+          else
+            echo "No Excel file generated."
+            exit 1
           fi
