@@ -2,6 +2,7 @@
 # Ag-Emb-Testsuite-Excel-Generator Agent
 # Purpose: Convert provided Test Plan JSON into a REAL .xlsx Excel file with formatting and data validation.
 # Output: Test_Output/GPIO/GPIO_TestPlan.xlsx (fixed name per task-specific rules)
+# Triggered via: workflow_dispatch or push to this script (CI will generate and commit Excel)
 
 import os
 import json
@@ -215,3 +216,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# CI trigger
