@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
-# Ag-Emb-Testsuite-Excel-Generator Agent
-# Purpose: Convert provided Test Plan JSON into a REAL .xlsx Excel file with formatting and data validation.
-# Output: Test_Output/GPIO/GPIO_TestPlan.xlsx (fixed name per task-specific rules)
-# Triggered via: workflow_dispatch or push to this script (CI will generate and commit Excel)
-
-import os
+# -*- coding: utf-8 -*-
+"""
+GPIO TestPlan Excel Generator
+- Consumes embedded JSON (authoritative)
+- Generates REAL .xlsx at Test_Output/GPIO/GPIO_TestPlan.xlsx
+- Formatting: bold header, freeze first row, borders, wrap text, approximate autofit
+- Adds data validation dropdown for last column: [Required, Not Required], allow blank
+"""
 import json
-from datetime import datetime
+import os
+import sys
+from typing import List, Dict
+
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side
 from openpyxl.worksheet.datavalidation import DataValidation
-from openpyxl.utils import get_column_letter
 
-# ---- Source JSON (use exactly as provided; do not alter) ----
-JSON_INPUT = r'''{
+# -------------------- Authoritative JSON (DO NOT MODIFY) --------------------
+JSON_DATA = r'''{
   "status": "SUCCESS",
   "data": [
     {
@@ -89,11 +93,11 @@ JSON_INPUT = r'''{
   ],
   "errors": []
 }'''
+# ---------------------------------------------------------------------------
 
-# ---- Config ----
 OUTPUT_PATH = os.path.join("Test_Output", "GPIO", "GPIO_TestPlan.xlsx")
 SHEET_NAME = "TestPlan"
-HEADERS = [
+COLUMNS: List[str] = [
     "Index",
     "SS / Module",
     "Feature",
@@ -106,51 +110,73 @@ HEADERS = [
     "Impacted Registers",
     "Validation / Acceptance Criteria",
     "Gap Analysis",
-    "Code Generation (Required / Not)",  # New column
+    "Code Generation (Required / Not)",
 ]
-WRAP_COLS = {
-    "Test Description",
-    "Test Steps / Procedure",
-    "Validation / Acceptance Criteria",
-}
+WRAP_COLS = {"Test Description", "Test Steps / Procedure", "Validation / Acceptance Criteria"}
 
-
-def validate_json(raw: str):
-    obj = json.loads(raw)
-    if not isinstance(obj, dict):
-        raise ValueError("Top-level JSON must be an object with keys 'status' and 'data'.")
-    if obj.get("status") != "SUCCESS":
-        raise ValueError("JSON status must be 'SUCCESS'.")
-    data = obj.get("data")
+def validate_json(payload: Dict) -> List[Dict]:
+    if not isinstance(payload, dict):
+        raise ValueError("Top-level JSON must be an object")
+    if payload.get("status") != "SUCCESS":
+        raise ValueError("JSON status must be 'SUCCESS'")
+    data = payload.get("data")
     if not isinstance(data, list):
-        raise ValueError("'data' must be a list of rows.")
+        raise ValueError("'data' must be an array of row objects")
     for i, row in enumerate(data, 1):
         if not isinstance(row, dict):
-            raise ValueError(f"Row {i} is not an object.")
+            raise ValueError(f"Row {i} is not an object")
     return data
 
 
-def build_workbook(rows):
+def autofit_columns(ws):
+    # Approximate autofit based on max string length
+    for col_idx, col_name in enumerate(COLUMNS, start=1):
+        max_len = len(col_name)
+        for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx):
+            cell = row[0]
+            val = cell.value
+            if val is None:
+                continue
+            s = str(val)
+            if len(s) > max_len:
+                max_len = len(s)
+        # Heuristic width; wrap columns can be narrower
+        base = 1.2
+        width = min(120, max(12 if col_name in WRAP_COLS else 18, int(max_len * base)))
+        ws.column_dimensions[cell.column_letter].width = width
+
+
+def main():
+    try:
+        payload = json.loads(JSON_DATA)
+        rows = validate_json(payload)
+    except Exception as e:
+        print(f"ERROR: Invalid JSON input: {e}", file=sys.stderr)
+        sys.exit(2)
+
     wb = Workbook()
     ws = wb.active
     ws.title = SHEET_NAME
 
-    # Header row
-    for col_idx, header in enumerate(HEADERS, start=1):
-        cell = ws.cell(row=1, column=col_idx, value=header)
-        cell.font = Font(bold=True)
-        cell.alignment = Alignment(vertical="center")
+    # Header
+    header_font = Font(bold=True)
+    thin = Side(style="thin", color="000000")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-    # Data rows
+    ws.append(COLUMNS)
+    for col_idx in range(1, len(COLUMNS) + 1):
+        c = ws.cell(row=1, column=col_idx)
+        c.font = header_font
+        c.border = border
+
+    # Rows
     for r_idx, row in enumerate(rows, start=2):
-        for c_idx, header in enumerate(HEADERS, start=1):
-            if header == "Code Generation (Required / Not)":
-                value = ""  # default empty
-            else:
-                value = row.get(header, "")
-            cell = ws.cell(row=r_idx, column=c_idx, value=value)
-            # Wrap alignment for certain columns
-            if header in WRAP_COLS:
+        values = [row.get(col, "") for col in COLUMNS[:-1]] + [""]
+        ws.append(values)
+        for c_idx, col_name in enumerate(COLUMNS, start=1):
+            cell = ws.cell(row=r_idx, column=c_idx)
+            cell.border = border
+            if col_name in WRAP_COLS:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
             else:
                 cell.alignment = Alignment(vertical="top")
@@ -158,63 +184,25 @@ def build_workbook(rows):
     # Freeze top row
     ws.freeze_panes = "A2"
 
-    # Data validation for the last column (entire column from row 2 downward)
-    last_col_idx = len(HEADERS)
-    last_col_letter = get_column_letter(last_col_idx)
-    dv = DataValidation(type="list", formula1='"Required,Not Required"', allow_blank=True, showErrorMessage=True)
-    dv.error = "Select a value from the dropdown: Required or Not Required (or leave blank)."
+    # Data validation for last column
+    last_col_letter = ws.cell(row=1, column=len(COLUMNS)).column_letter
+    dv = DataValidation(type="list", formula1='"Required,Not Required"', allow_blank=True, showDropDown=True)
+    dv.error = "Select from the list"
+    dv.prompt = "Choose Required or Not Required (blank allowed)"
     ws.add_data_validation(dv)
-    dv.ranges.append(f"{last_col_letter}2:{last_col_letter}1048576")  # apply to all potential rows
+    dv.add(f"{last_col_letter}2:{last_col_letter}{ws.max_row}")
 
-    # Apply thin borders to all populated cells
-    thin = Side(style="thin", color="000000")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    max_row = ws.max_row
-    max_col = ws.max_column
-    for row in ws.iter_rows(min_row=1, max_row=max_row, min_col=1, max_col=max_col):
-        for cell in row:
-            cell.border = border
+    # Autofit columns (approx)
+    autofit_columns(ws)
 
-    # Autofit columns (approximation)
-    col_widths = {}
-    for col_idx in range(1, max_col + 1):
-        header = HEADERS[col_idx - 1]
-        max_len = len(str(header)) if header else 0
-        for row_idx in range(2, max_row + 1):
-            val = ws.cell(row=row_idx, column=col_idx).value
-            if val is None:
-                continue
-            # Use a conservative width estimation
-            val_str = str(val)
-            line_max = max((len(line) for line in val_str.splitlines()), default=0)
-            max_len = max(max_len, line_max)
-        # Base width scaling; cap to reasonable limits
-        base = max_len * 1.1 + 2
-        if header in WRAP_COLS:
-            base = max(base, 60)  # ensure readability for wrapped text
-        base = min(max(base, 10), 120)
-        col_widths[col_idx] = base
-
-    for col_idx, width in col_widths.items():
-        ws.column_dimensions[get_column_letter(col_idx)].width = width
-
-    return wb
-
-
-def main():
-    rows = validate_json(JSON_INPUT)
-
-    # Ensure output directory exists
+    # Ensure output dir exists
     out_dir = os.path.dirname(OUTPUT_PATH)
-    if out_dir and not os.path.exists(out_dir):
-        os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(out_dir, exist_ok=True)
 
-    wb = build_workbook(rows)
+    # Save workbook
     wb.save(OUTPUT_PATH)
-    print(f"Saved Excel to: {OUTPUT_PATH}")
+    print(f"Saved Excel to {OUTPUT_PATH}")
 
 
 if __name__ == "__main__":
     main()
-
-# CI trigger
