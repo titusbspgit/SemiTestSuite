@@ -1,0 +1,72 @@
+name: Generate TestPlan Excel
+
+on:
+  workflow_dispatch:
+    inputs:
+      json_path:
+        description: "Path to Test Plan JSON in repo"
+        required: true
+        default: "Test_Input/testplan.json"
+      output_dir:
+        description: "Directory to write Excel to"
+        required: true
+        default: "Test_Output/GPIO"
+  push:
+    paths:
+      - 'Test_Input/**'
+      - 'tools/generate_testplan_excel.py'
+      - '.github/workflows/generate-testplan-excel.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install openpyxl
+
+      - name: Resolve inputs
+        id: vars
+        run: |
+          if [ -n "${{ github.event.inputs.json_path }}" ]; then
+            echo "JSON_PATH=${{ github.event.inputs.json_path }}" >> $GITHUB_OUTPUT
+          else
+            echo "JSON_PATH=Test_Input/testplan.json" >> $GITHUB_OUTPUT
+          fi
+          if [ -n "${{ github.event.inputs.output_dir }}" ]; then
+            echo "OUT_DIR=${{ github.event.inputs.output_dir }}" >> $GITHUB_OUTPUT
+          else
+            echo "OUT_DIR=Test_Output/GPIO" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate Excel
+        run: |
+          python tools/generate_testplan_excel.py --json-path "${{ steps.vars.outputs.JSON_PATH }}" --output-dir "${{ steps.vars.outputs.OUT_DIR }}"
+
+      - name: Commit Excel
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "Added generated TestPlan Excel"
+            git push origin HEAD:main
+          else
+            echo "No changes to commit."
+          fi
